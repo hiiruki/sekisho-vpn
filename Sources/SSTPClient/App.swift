@@ -21,6 +21,8 @@ struct SSTPClientApp: App {
             CommandGroup(replacing: .appInfo) {
                 Button("About Sekisho") { showAbout() }
                 Button("Check for Updates…") { updater.checkForUpdates(nil) }
+                Divider()
+                Button("Uninstall Helper…") { vpn.uninstallHelper() }.disabled(!vpn.helperReachable)
             }
         }
 
@@ -381,34 +383,84 @@ final class VPNModel: ObservableObject {
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
-    func exportLogs() {
+    /// Save panel for "Sekisho[-what]-2026-11-28_04-30-15.log"; `contents` runs off the main thread.
+    private func saveLog(_ what: String? = nil, message: String? = nil, contents: @escaping @Sendable () -> String) {
         let stamp = DateFormatter()
         stamp.dateFormat = "yyyy-MM-dd_HH-mm-ss"
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "Sekisho-\(stamp.string(from: Date())).log"
+        panel.nameFieldStringValue = (["Sekisho", what, stamp.string(from: Date())].compactMap { $0 }).joined(separator: "-") + ".log"
         panel.allowedContentTypes = [UTType(filenameExtension: "log") ?? .plainText]
         panel.isExtensionHidden = false // macOS hides it by default with Finder's setting; the user wants to see .log
+        if let message { panel.message = message }
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            try (logs.joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
-        } catch {
-            installError = "Export failed: \(error.localizedDescription)"
+        Task.detached {
+            do {
+                try contents().write(to: url, atomically: true, encoding: .utf8)
+            } catch {
+                await MainActor.run { self.installError = "Export failed: \(error.localizedDescription)" }
+            }
         }
     }
 
-    /// Runs the bundled installer as root via the standard macOS admin password prompt.
-    func installHelper() {
+    func exportLogs() {
+        let text = logs.joined(separator: "\n") + "\n"
+        saveLog { text }
+    }
+
+    /// Log plus the Mac's view of the network (routes, DNS, interfaces) for a VPN administrator. No passwords.
+    func exportDiagnostics() {
+        let info = Bundle.main.infoDictionary ?? [:]
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        var profile = sessionProfile ?? current
+        profile.password = ""
+        let head = """
+        Sekisho \(info["CFBundleShortVersionString"] ?? "?") (\(info["CFBundleVersion"] ?? "?")), \
+        macOS \(ProcessInfo.processInfo.operatingSystemVersionString), \(Date())
+        Helper: \(helperReachable ? (helperOutdated ? "outdated" : "running") : "not running")
+
+        == Status
+        \(String(decoding: (try? enc.encode(status)) ?? Data(), as: UTF8.self))
+
+        == Profile (password removed)
+        \(String(decoding: (try? enc.encode(profile)) ?? Data(), as: UTF8.self))
+        """
+        let log = logs.joined(separator: "\n")
+        saveLog("diagnostics", message: "Contains the server, username, addresses, routes and DNS settings; no passwords.") {
+            var out = head
+            for (path, args) in [("/usr/sbin/netstat", ["-rn", "-f", "inet"]), ("/usr/sbin/scutil", ["--dns"]), ("/sbin/ifconfig", [])] {
+                out += "\n\n== \(([path] + args).joined(separator: " "))\n" + commandOutput(path, args)
+            }
+            return out + "\n\n== Log\n" + log + "\n"
+        }
+    }
+
+    func installHelper() { runAsRoot("install-daemon.sh", "sstpd") }
+
+    func uninstallHelper() {
+        let a = NSAlert()
+        a.messageText = "Uninstall the helper?"
+        a.informativeText = "This disconnects the VPN and removes the root helper (sstpd). Sekisho cannot connect until you install it again. Your profiles are kept."
+        a.addButton(withTitle: "Uninstall").hasDestructiveAction = true
+        a.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+        runAsRoot("uninstall-daemon.sh")
+    }
+
+    /// Runs a bundled script as root via the standard macOS admin password prompt; arguments are bundled files too.
+    private func runAsRoot(_ script: String, _ files: String...) {
         guard let dir = Bundle.main.resourceURL?.path else { return }
         func shq(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
-        let cmd = "/bin/sh \(shq(dir + "/install-daemon.sh")) \(shq(dir + "/sstpd"))"
+        let cmd = "/bin/sh " + ([script] + files).map { shq(dir + "/" + $0) }.joined(separator: " ")
         let escaped = cmd.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-        let script = "do shell script \"\(escaped)\" with administrator privileges"
+        let osa = "do shell script \"\(escaped)\" with administrator privileges"
         installError = nil
         Task.detached {
             let p = Process()
             p.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-            p.arguments = ["-e", script]
+            p.arguments = ["-e", osa]
             let err = Pipe()
             p.standardError = err
             try? p.run()
@@ -419,6 +471,20 @@ final class VPNModel: ObservableObject {
             }
         }
     }
+}
+
+/// stdout and stderr of a command, or why it could not run.
+func commandOutput(_ path: String, _ args: [String]) -> String {
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: path)
+    p.arguments = args
+    let out = Pipe()
+    p.standardOutput = out
+    p.standardError = out
+    do { try p.run() } catch { return "(\(error.localizedDescription))" }
+    let text = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    p.waitUntilExit()
+    return text
 }
 
 // MARK: views
@@ -471,7 +537,7 @@ struct ContentView: View {
 
             if vpn.status.state == .connected { TrafficView() }
 
-            LogView(lines: vpn.logs) { vpn.exportLogs() }
+            LogView(lines: vpn.logs, export: vpn.exportLogs, diagnostics: vpn.exportDiagnostics)
 
             HStack(spacing: 20) {
                 Toggle("Launch at login", isOn: Binding(get: { vpn.launchAtLogin }, set: { vpn.setLaunchAtLogin($0) }))
@@ -595,6 +661,7 @@ struct TrafficView: View {
 struct LogView: View {
     let lines: [String]
     let export: () -> Void
+    let diagnostics: () -> Void
 
     var body: some View {
         GroupBox {
@@ -622,6 +689,8 @@ struct LogView: View {
                 }
                 .controlSize(.small).disabled(lines.isEmpty)
                 Button("Export…", action: export).controlSize(.small).disabled(lines.isEmpty)
+                Button("Diagnostics…", action: diagnostics).controlSize(.small)
+                    .help("Save the log with routes, DNS and interface details for your VPN administrator")
             }
         }
     }

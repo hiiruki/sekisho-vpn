@@ -19,7 +19,7 @@ KC=$(scripts/make-signing-identity.sh)
 rm -rf build/app.noindex # also drops apps built under older names
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN/SSTPClient" "$APP/Contents/MacOS/"
-cp "$BIN/sstpd" scripts/install-daemon.sh "$APP/Contents/Resources/"
+cp "$BIN/sstpd" scripts/install-daemon.sh scripts/uninstall-daemon.sh "$APP/Contents/Resources/"
 ditto "$BIN/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
 install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/SSTPClient"
 
