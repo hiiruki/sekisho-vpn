@@ -8,7 +8,8 @@ import SSTPKit
 
 @main
 struct SSTPClientApp: App {
-    @StateObject private var vpn = VPNModel()
+    @StateObject private var vpn = VPNModel.shared
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     // feed and EdDSA key come from Info.plist (SUFeedURL, SUPublicEDKey: scripts/build-app.sh)
     private let updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
 
@@ -125,8 +126,16 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     }
 }
 
+/// Receives sekisho:// links (Launch Services delivers them as "open URLs").
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls { VPNModel.shared.open(url) }
+    }
+}
+
 @MainActor
 final class VPNModel: ObservableObject {
+    static let shared = VPNModel() // one model for the app and the delegate that receives links
     @Published var status = Status()
     @Published var logs: [String] = []
     @Published var history: [Sample] = [] // last 60 s of speeds
@@ -339,6 +348,29 @@ final class VPNModel: ObservableObject {
     /// Global hotkey: one key to bring the VPN up or down.
     func toggleVPN() {
         if busy { disconnect() } else if canConnect { connect() }
+    }
+
+    /// sekisho://connect[?profile=Name], sekisho://disconnect, sekisho://toggle: for Shortcuts, Raycast, Focus filters.
+    /// Links only switch between configured profiles; they cannot add a server.
+    func open(_ url: URL) {
+        guard url.scheme?.lowercased() == "sekisho" else { return }
+        let name = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "profile" }?.value
+        switch url.host?.lowercased() {
+        case "connect":
+            if let name {
+                guard let p = profiles.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
+                    return notify("Unknown profile", "No profile named “\(name)”.")
+                }
+                if !busy { selectedID = p.id }
+            }
+            if !busy, canConnect { connect() }
+        case "disconnect":
+            if busy { disconnect() }
+        case "toggle":
+            toggleVPN()
+        default:
+            notify("Unknown link", url.absoluteString)
+        }
     }
 
     // MARK: auto-connect outside trusted Wi-Fi

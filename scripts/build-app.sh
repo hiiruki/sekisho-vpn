@@ -54,6 +54,10 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>SUPublicEDKey</key><string>ihtVbJ2XI0OMficqNIOKwJZu2gksfGDBJLqu2LDZjQM=</string>
   <key>NSLocationUsageDescription</key><string>Sekisho reads the Wi-Fi name to connect automatically outside your trusted networks.</string>
   <key>NSLocationWhenInUseUsageDescription</key><string>Sekisho reads the Wi-Fi name to connect automatically outside your trusted networks.</string>
+  <key>CFBundleURLTypes</key><array><dict>
+    <key>CFBundleURLName</key><string>moe.hiiruki.sekisho</string>
+    <key>CFBundleURLSchemes</key><array><string>sekisho</string></array>
+  </dict></array>
 </dict></plist>
 EOF
 
