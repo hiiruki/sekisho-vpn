@@ -1,0 +1,6 @@
+.build/
+build/
+.swiftpm/
+.DS_Store
+# exported Sparkle EdDSA private key (generate_keys -x): keep it out of the repo
+*.key
