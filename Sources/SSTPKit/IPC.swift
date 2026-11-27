@@ -67,6 +67,9 @@ public struct Profile: Codable, Equatable, Identifiable {
         if let bad = routeList.first(where: { parseCIDR($0) == nil && !isHostname($0) }) { return "Invalid subnet or hostname: \(bad)" }
         if let bad = domainList.first(where: { !isDomainName($0) }) { return "Invalid domain: \(bad)" }
         if !healthCheck.trimmingCharacters(in: .whitespaces).isEmpty, healthTarget == nil { return "Invalid health check: \(healthCheck)" }
+        if let pin = pinnedCert?.replacingOccurrences(of: ":", with: ""), pin.count != 64 || !pin.allSatisfy(\.isHexDigit) {
+            return "Invalid pinned certificate"
+        }
         return nil
     }
 }

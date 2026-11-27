@@ -58,6 +58,18 @@ cat > "$APP/Contents/Info.plist" <<EOF
     <key>CFBundleURLName</key><string>moe.hiiruki.sekisho</string>
     <key>CFBundleURLSchemes</key><array><string>sekisho</string></array>
   </dict></array>
+  <key>UTExportedTypeDeclarations</key><array><dict>
+    <key>UTTypeIdentifier</key><string>moe.hiiruki.sekisho.profile</string>
+    <key>UTTypeDescription</key><string>Sekisho VPN Profile</string>
+    <key>UTTypeConformsTo</key><array><string>public.json</string></array>
+    <key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>sekisho</string></array></dict>
+  </dict></array>
+  <key>CFBundleDocumentTypes</key><array><dict>
+    <key>CFBundleTypeName</key><string>Sekisho VPN Profile</string>
+    <key>CFBundleTypeRole</key><string>Viewer</string>
+    <key>LSHandlerRank</key><string>Owner</string>
+    <key>LSItemContentTypes</key><array><string>moe.hiiruki.sekisho.profile</string></array>
+  </dict></array>
 </dict></plist>
 EOF
 

@@ -154,6 +154,17 @@ for bad in ["host:0", "host:99999", "a:b:c", "10.0.0.0/8", "x;y"] {
 }
 profile.healthCheck = ""
 
+// Pinned certificates (also from imported files) must be SHA-256 hex, with or without colons
+profile.pinnedCert = String(repeating: "ab", count: 32)
+check(profile.problem == nil)
+profile.pinnedCert = Array(repeating: "AB", count: 32).joined(separator: ":")
+check(profile.problem == nil)
+for bad in ["", "abc", String(repeating: "zz", count: 32)] {
+    profile.pinnedCert = bad
+    check(profile.problem != nil, bad)
+}
+profile.pinnedCert = nil
+
 md4Vectors()
 msChapV2Vectors()
 sstpFraming()

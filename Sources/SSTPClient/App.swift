@@ -19,6 +19,10 @@ struct SSTPClientApp: App {
         }
         .windowResizability(.contentSize)
         .commands {
+            CommandGroup(after: .newItem) {
+                Button("Import Profile…") { vpn.importProfile() }
+                Button("Export Profile…") { vpn.exportProfile() }
+            }
             CommandGroup(replacing: .appInfo) {
                 Button("About Sekisho") { showAbout() }
                 Button("Check for Updates…") { updater.checkForUpdates(nil) }
@@ -353,6 +357,7 @@ final class VPNModel: ObservableObject {
     /// sekisho://connect[?profile=Name], sekisho://disconnect, sekisho://toggle: for Shortcuts, Raycast, Focus filters.
     /// Links only switch between configured profiles; they cannot add a server.
     func open(_ url: URL) {
+        if url.isFileURL { return importProfile(from: url) } // a double-clicked .sekisho file
         guard url.scheme?.lowercased() == "sekisho" else { return }
         let name = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "profile" }?.value
         switch url.host?.lowercased() {
@@ -371,6 +376,77 @@ final class VPNModel: ObservableObject {
         default:
             notify("Unknown link", url.absoluteString)
         }
+    }
+
+    // MARK: profile files
+
+    static let profileType = UTType(filenameExtension: "sekisho", conformingTo: .json) ?? .json
+
+    /// Writes the selected profile as a .sekisho file for colleagues: server and settings, never the password.
+    func exportProfile() {
+        var p = current
+        p.password = ""
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = (p.name.isEmpty ? "VPN" : p.name) + ".sekisho"
+        panel.allowedContentTypes = [Self.profileType]
+        panel.message = "Contains the server and settings of “\(p.name)”, not the password."
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        do {
+            try enc.encode(p).write(to: url, options: .atomic)
+        } catch {
+            installError = "Export failed: \(error.localizedDescription)"
+        }
+    }
+
+    /// Adds a profile from a .sekisho file after the user confirms; a pinned certificate is shown, since importing it
+    /// means trusting that server.
+    func importProfile(from file: URL? = nil) {
+        let url: URL
+        if let file {
+            url = file
+        } else {
+            let panel = NSOpenPanel()
+            panel.allowedContentTypes = [Self.profileType]
+            NSApp.activate(ignoringOtherApps: true)
+            guard panel.runModal() == .OK, let picked = panel.url else { return }
+            url = picked
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        guard let data = try? Data(contentsOf: url), data.count < 64 << 10,
+              var p = try? JSONDecoder().decode(Profile.self, from: data) else {
+            alert("Cannot import “\(url.lastPathComponent)”", "The file is not a Sekisho profile.")
+            return
+        }
+        if let problem = p.problem {
+            alert("Cannot import “\(p.name)”", problem)
+            return
+        }
+        var info = "Server: \(p.server):\(p.port)"
+        if let pin = p.pinnedCert {
+            info += "\n\nThis profile trusts a server certificate that macOS does not:\nSHA-256 \(fingerprint(pin.replacingOccurrences(of: ":", with: "")))\n\nImport it only if the file comes from your VPN administrator."
+        }
+        guard alert("Import “\(p.name)”?", info, confirm: "Import") else { return }
+        p.id = UUID()
+        p.password = ""
+        if profiles.contains(where: { $0.name == p.name }) { p.name += " (imported)" } // sessions are matched by name
+        profiles.append(p)
+        if !busy { selectedID = p.id }
+    }
+
+    /// Modal alert; with `confirm`, also a Cancel button, and true when confirmed.
+    @discardableResult
+    private func alert(_ title: String, _ text: String, confirm: String? = nil) -> Bool {
+        let a = NSAlert()
+        a.messageText = title
+        a.informativeText = text
+        if let confirm {
+            a.addButton(withTitle: confirm)
+            a.addButton(withTitle: "Cancel")
+        }
+        return a.runModal() == .alertFirstButtonReturn
     }
 
     // MARK: auto-connect outside trusted Wi-Fi
@@ -544,6 +620,14 @@ struct ContentView: View {
                 Button { vpn.addProfile() } label: { Image(systemName: "plus") }.help("Add profile")
                 Button { vpn.removeCurrentProfile() } label: { Image(systemName: "minus") }
                     .help("Remove this profile").disabled(vpn.profiles.count < 2)
+                Menu {
+                    Button("Import Profile…") { vpn.importProfile() }
+                    Button("Export Profile…") { vpn.exportProfile() }
+                } label: {
+                    Image(systemName: "square.and.arrow.up.on.square")
+                }
+                .menuStyle(.borderlessButton).fixedSize()
+                .help("Share profiles as .sekisho files (without passwords)")
             }
             .disabled(vpn.busy)
 
