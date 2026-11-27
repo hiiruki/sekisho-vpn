@@ -18,16 +18,21 @@ Command Line Tools and Swift Package Manager are enough.
 
 - **SSTP** over TLS 1.2+ with **MS-CHAPv2** and SSTP crypto binding (works with Windows RRAS / SSTP servers)
 - **Profiles**: several servers; passwords in the macOS Keychain
-- **Full tunnel** (all traffic) or **split tunnel** (only listed subnets) with **split DNS** (only listed domains)
-- **Kill switch** (full tunnel): blocks internet while the VPN is down, including during reconnects
+- **Full tunnel** (all traffic) or **split tunnel** (only listed subnets or hostnames) with **split DNS** (only listed domains)
+- **Kill switch** (full tunnel): blocks internet while the VPN is down, including during reconnects; can be paused for 2 minutes so a hotel or café Wi-Fi login page can load
 - **Auto-reconnect** after drops, sleep/wake or network changes (backoff 2 s → 60 s)
-- **Certificate pinning** for servers whose certificate macOS does not trust (self-signed / private CA)
+- **Certificate pinning** for servers whose certificate macOS does not trust (self-signed / private CA), and a warning 14 days before the server certificate expires
+- **Health check**: an internal host that must be reachable through the VPN; the session reconnects when it is not
 - **IPv6 leak protection** in full-tunnel mode
-- **Live logs** (copy all, export to a `.log` file), **speed** and totals, **latency** to the server, a 60-second **speed chart**, connection **duration**
+- **Live logs** (copy all, export to a `.log` file), **speed** and totals, **latency** to the server, a 60-second **speed chart**, connection **duration**, **session history**
+- **Diagnostics…**: one `.log` with the log, routes, DNS and interfaces for your VPN administrator (no passwords)
+- **Profile files**: export a profile as `.sekisho` (without the password) for colleagues; import or double-click to add
+- **Links** for Shortcuts, Raycast or Focus filters: `sekisho://connect?profile=Name`, `sekisho://disconnect`, `sekisho://toggle`
 - **Menu bar**: fixed-width ↑/↓ speed readout, connect/disconnect per profile; **⌃⌥⌘V** toggles the VPN from any app
 - **Auto-connect** whenever the Mac is not on a trusted Wi-Fi (needs Location permission: macOS hides Wi-Fi names otherwise)
 - **Notifications** for connected, connection lost, reconnected, disconnected and failed connections; **launch at login**; **connect when the app starts**
-- **Updates** through Sparkle from GitHub Releases (**Sekisho → Check for Updates…**)
+- **Updates** through Sparkle from GitHub Releases (**Sekisho → Check for Updates…**); **Uninstall Helper…** in the same menu
+- **English and Bahasa Indonesia** (follows the system language, or set it per app in System Settings → General → Language & Region)
 
 ## Install
 
@@ -79,11 +84,12 @@ Keep an offline backup of both: without the Sparkle key, installed copies can no
 
 | Field | Meaning |
 |---|---|
-| Split tunnel | Empty: all traffic through the VPN. Otherwise subnets/IPs, e.g. `192.168.212.0/24, 10.0.0.0/8` |
+| Split tunnel | Empty: all traffic through the VPN. Otherwise subnets/IPs and hostnames, e.g. `192.168.212.0/24, intranet.collega.co.id`. Hostnames are resolved by the VPN's DNS (they are added to split DNS) and their addresses refreshed every 5 minutes |
 | DNS domains | Split tunnel only: domains resolved by the VPN's DNS, e.g. `collega.co.id`. Other names use your normal DNS |
 | Kill switch | Full tunnel only. On a drop, traffic stays blocked (except the local network and the VPN server) until the VPN is back or you disconnect |
 | Reconnect automatically | Reconnects a session that was up and dropped. Wrong password or an untrusted certificate never retries |
 | Pinned certificate | Set by **Trust This Certificate and Connect**. Compare the fingerprint with your administrator first |
+| Health check | Optional `host` or `host:port` (default 443) inside the network. Checked every 30 s over TCP; unreachable for 90 s reconnects (with Reconnect automatically). In split tunnel, list the host under Split tunnel too |
 
 ## How it works
 
@@ -190,9 +196,13 @@ reconnecting, the last server address is reused if DNS is unreachable, for examp
   (`--client-requirement`) when the helper is installed from the app. A process of the same user that can run
   `codesign` with the local signing key can still pass; a Developer ID (key off the Mac) would close that.
 - **Input validation:** profiles are validated inside the root daemon. Subnets must be strict dotted quads with a
-  prefix of 1–32, and DNS domains must be plain hostnames, because both end up in `route` arguments and `scutil` input.
+  prefix of 1–32, and split-tunnel hostnames, DNS domains and the health check host must be plain hostnames (no
+  all-numeric names), because they end up in `route` arguments and `scutil` input.
 - **Secrets:** passwords live in the Keychain and travel only over the local socket. They are never logged or
-  written to disk by the daemon.
+  written to disk by the daemon. Exported profiles and diagnostics never contain them.
+- **Profile files and links:** an imported `.sekisho` file is validated like any profile and needs a confirmation that
+  shows its pinned certificate, if any, because importing it means trusting that server. `sekisho://` links only
+  connect, disconnect or switch between profiles you already have; they cannot add a server.
 - **TLS:** the system trust store with hostname check, or an explicitly pinned SHA-256 certificate fingerprint. No "accept any certificate".
 - **Root binary:** installed root-owned (`root:wheel 755`), so the app bundle cannot swap what runs as root later.
   This is also why the helper is not registered with `SMAppService.daemon`: that runs it from inside the user-writable
@@ -209,7 +219,8 @@ reconnecting, the last server address is reused if DNS is unreachable, for examp
 | `Sources/SSTPKit/System.swift` | utun, route lookup, undo journal, pf, kill switch |
 | `Sources/SSTPKit/IPC.swift` | Profile, Status, socket protocol, validation |
 | `Sources/sstpd/Server.swift` | Socket server, session supervisor (reconnect, kill switch), crash recovery |
-| `Sources/SSTPClient/` | SwiftUI app, menu bar, Keychain |
+| `Sources/SSTPClient/` | SwiftUI app, menu bar, Keychain, hotkey and Wi-Fi watcher (`Watchers.swift`) |
+| `Localization/` | Translations (`id.lproj`), copied into the app by `build-app.sh` |
 | `Sources/selftest/` | `swift run selftest` checks |
 
 ## Limits
