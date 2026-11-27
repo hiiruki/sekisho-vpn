@@ -25,6 +25,24 @@ public struct Profile: Codable, Equatable, Identifiable {
 
     public init() {}
 
+    /// Missing keys take their defaults: the synthesized decoder rejects them, and a field added in a later version
+    /// would then make every saved profile (and older shared files) fail to load.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = Profile()
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? d.id
+        name = try c.decodeIfPresent(String.self, forKey: .name) ?? d.name
+        server = try c.decodeIfPresent(String.self, forKey: .server) ?? d.server
+        port = try c.decodeIfPresent(UInt16.self, forKey: .port) ?? d.port
+        username = try c.decodeIfPresent(String.self, forKey: .username) ?? d.username
+        password = try c.decodeIfPresent(String.self, forKey: .password) ?? d.password
+        pinnedCert = try c.decodeIfPresent(String.self, forKey: .pinnedCert)
+        routes = try c.decodeIfPresent(String.self, forKey: .routes) ?? d.routes
+        dnsDomains = try c.decodeIfPresent(String.self, forKey: .dnsDomains) ?? d.dnsDomains
+        killSwitch = try c.decodeIfPresent(Bool.self, forKey: .killSwitch) ?? d.killSwitch
+        autoReconnect = try c.decodeIfPresent(Bool.self, forKey: .autoReconnect) ?? d.autoReconnect
+    }
+
     public var routeList: [String] { tokens(routes) }
     public var domainList: [String] { tokens(dnsDomains) }
     public var isFullTunnel: Bool { routeList.isEmpty }

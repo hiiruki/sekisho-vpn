@@ -130,6 +130,10 @@ profile.dnsDomains = ""
 profile.routes = "0.0.0.0/0"
 check(profile.problem != nil)
 
+// Profiles saved by older versions lack newer keys; they must still load with defaults
+let old = try! JSONDecoder().decode(Profile.self, from: Data(#"{"name":"Old","server":"vpn.example.com","port":8783}"#.utf8))
+check(old.name == "Old" && old.port == 8783 && old.autoReconnect && !old.killSwitch && old.pinnedCert == nil)
+
 md4Vectors()
 msChapV2Vectors()
 sstpFraming()
