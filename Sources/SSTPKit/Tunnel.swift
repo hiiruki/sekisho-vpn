@@ -42,6 +42,8 @@ public final class Tunnel {
     private var rxBytes: UInt64 = 0, txBytes: UInt64 = 0 // IP bytes through the tunnel
     private var lastSample = Date()
     private var echoSent: Date? // pending SSTP echo, for the latency readout
+    private var ticks = 0
+    private var routedHosts: Set<String> = [] // addresses of split-tunnel hostnames already routed
 
     private static let serviceKey = "State:/Network/Service/Sekisho"
     private static let ipv6Anchor = "com.apple/sekisho.ipv6"
@@ -218,6 +220,8 @@ public final class Tunnel {
         if status.state == .connecting, Date().timeIntervalSince(started) > 45 { return finish("Connection timed out") }
         guard httpDone else { return }
         sendEcho()
+        ticks += 1
+        if ticks % 30 == 0 { routeHosts() } // every 5 min: follow DNS changes of split-tunnel hostnames
         if Date().timeIntervalSince(lastRx) > 45 { finish("Server stopped responding") }
     }
 
@@ -287,7 +291,7 @@ public final class Tunnel {
                 }
                 do { try PF.load(Self.ipv6Anchor, PF.blockIPv6, undo: undo) } catch { log("IPv6 leak protection failed: \(error)") }
             } else {
-                for net in profile.routeList.compactMap(parseCIDR) {
+                for net in profile.routeSubnets {
                     try sys("/sbin/route", ["-n", "add", "-net", net, "-interface", name],
                             undo: ["-n", "delete", "-net", net, "-interface", name])
                 }
@@ -310,6 +314,7 @@ public final class Tunnel {
             t.resume()
             statsTimer = t
             sendEcho() // a latency reading right away instead of after the first 10 s tick
+            routeHosts()
         } catch {
             finish("Network setup failed: \(error)")
         }
@@ -325,9 +330,10 @@ public final class Tunnel {
             script = servers + "set \(Self.serviceKey)/DNS\n"
                 + "d.init\nd.add Addresses * \(local)\nd.add SubnetMasks * 255.255.255.255\nd.add InterfaceName \(name)\n"
                 + "d.add Router \(local)\nd.add OverridePrimary # 1\nset \(Self.serviceKey)/IPv4\n"
-        } else if !profile.domainList.isEmpty {
-            // split DNS: only these domains (and their subdomains) go to the VPN's DNS servers
-            script = servers + "d.add SupplementalMatchDomains * \(profile.domainList.joined(separator: " "))\n"
+        } else if !(profile.domainList + profile.routeHosts).isEmpty {
+            // split DNS: only these domains (and their subdomains) go to the VPN's DNS servers; split-tunnel hostnames
+            // too, so they resolve to their internal addresses
+            script = servers + "d.add SupplementalMatchDomains * \((profile.domainList + profile.routeHosts).joined(separator: " "))\n"
                 + "d.add SupplementalMatchDomainsNoSearch # 1\nset \(Self.serviceKey)/DNS\n"
         } else {
             return // split tunnel without DNS domains: keep the system DNS
@@ -336,6 +342,35 @@ public final class Tunnel {
                 undoInput: "remove \(Self.serviceKey)/DNS\nremove \(Self.serviceKey)/IPv4\n")
         dnsApplied = true
         flushDNSCache()
+    }
+
+    /// Split-tunnel hostnames: resolve (through the VPN's DNS, see applyDNS) and route each new address into the tunnel.
+    /// Addresses that disappear keep their route until disconnect.
+    private func routeHosts() {
+        let hosts = profile.routeHosts, server = serverIP
+        guard !hosts.isEmpty, let name = status.interface else { return }
+        DispatchQueue.global().async { [weak self] in
+            let resolved = hosts.map { ($0, resolveAllIPv4($0)) }
+            self?.q.async {
+                guard let self, !self.ended else { return }
+                for (host, ips) in resolved {
+                    if ips.isEmpty { log("Cannot resolve \(host)") }
+                    // never the VPN server itself: its route must stay outside the tunnel
+                    let new = ips.filter { $0 != server && !self.routedHosts.contains($0) }
+                    guard !new.isEmpty else { continue }
+                    for ip in new {
+                        do {
+                            try self.sys("/sbin/route", ["-n", "add", "-host", ip, "-interface", name],
+                                         undo: ["-n", "delete", "-host", ip, "-interface", name])
+                            self.routedHosts.insert(ip)
+                        } catch {
+                            log("Route to \(ip) failed: \(error)")
+                        }
+                    }
+                    log("\(host) → \(new.joined(separator: ", "))")
+                }
+            }
+        }
     }
 
     private func sampleRates() {

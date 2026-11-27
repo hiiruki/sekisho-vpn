@@ -27,17 +27,27 @@ func run(_ path: String, _ args: [String], input: String? = nil) throws -> Strin
     return text
 }
 
-func resolveIPv4(_ host: String) -> String? {
+func resolveIPv4(_ host: String) -> String? { resolveAllIPv4(host).first }
+
+/// Every IPv4 address of `host`, in resolver order, without duplicates.
+func resolveAllIPv4(_ host: String) -> [String] {
     var hints = addrinfo(ai_flags: 0, ai_family: AF_INET, ai_socktype: SOCK_STREAM, ai_protocol: 0,
                          ai_addrlen: 0, ai_canonname: nil, ai_addr: nil, ai_next: nil)
     var res: UnsafeMutablePointer<addrinfo>?
-    guard getaddrinfo(host, nil, &hints, &res) == 0, let ai = res else { return nil }
+    guard getaddrinfo(host, nil, &hints, &res) == 0 else { return [] }
     defer { freeaddrinfo(res) }
+    var out: [String] = []
     var buf = [CChar](repeating: 0, count: Int(INET_ADDRSTRLEN))
-    return ai.pointee.ai_addr.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { sin in
-        var addr = sin.pointee.sin_addr
-        return inet_ntop(AF_INET, &addr, &buf, socklen_t(buf.count)).map { String(cString: $0) }
+    var p = res
+    while let ai = p {
+        let ip = ai.pointee.ai_addr.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { sin in
+            var addr = sin.pointee.sin_addr
+            return inet_ntop(AF_INET, &addr, &buf, socklen_t(buf.count)).map { String(cString: $0) }
+        }
+        if let ip, !out.contains(ip) { out.append(ip) }
+        p = ai.pointee.ai_next
     }
+    return out
 }
 
 /// Current route to `ip`: gateway (nil if on-link) and outgoing interface.

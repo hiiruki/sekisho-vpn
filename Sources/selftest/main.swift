@@ -134,6 +134,15 @@ check(profile.problem != nil)
 let old = try! JSONDecoder().decode(Profile.self, from: Data(#"{"name":"Old","server":"vpn.example.com","port":8783}"#.utf8))
 check(old.name == "Old" && old.port == 8783 && old.autoReconnect && !old.killSwitch && old.pinnedCert == nil)
 
+// Split tunnel accepts hostnames; an all-numeric name would resolve as an address, so it is rejected
+profile.routes = "192.168.212.0/24, intranet.example.com"
+check(profile.problem == nil && profile.routeSubnets == ["192.168.212.0/24"] && profile.routeHosts == ["intranet.example.com"])
+for bad in ["10.1.2", "intra_net.example", "-bad.example", "a.com;reboot"] {
+    profile.routes = bad
+    check(profile.problem != nil, bad)
+}
+profile.routes = ""
+
 md4Vectors()
 msChapV2Vectors()
 sstpFraming()

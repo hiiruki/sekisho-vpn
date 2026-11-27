@@ -5,7 +5,7 @@ import Foundation
 
 public let daemonSocketPath = ProcessInfo.processInfo.environment["SSTPD_SOCKET"] ?? "/var/run/sekisho.sock"
 /// Bump when Event/Status or helper behavior change, so the GUI asks to update the installed helper.
-public let protocolVersion = 5
+public let protocolVersion = 6
 
 public struct Profile: Codable, Equatable, Identifiable {
     public var id = UUID()
@@ -16,7 +16,8 @@ public struct Profile: Codable, Equatable, Identifiable {
     public var password = "" // travels to the daemon only; the GUI stores it in the Keychain
     /// SHA-256 (hex) of a server certificate the user chose to trust although macOS does not (pinned: others are refused).
     public var pinnedCert: String?
-    /// Split tunnel: subnets sent through the VPN ("192.168.212.0/24, 10.1.2.3"). Empty = all traffic.
+    /// Split tunnel: subnets or hostnames sent through the VPN ("192.168.212.0/24, intranet.example.com"). Empty = all traffic.
+    /// Hostnames are resolved by the VPN's DNS and routed by address.
     public var routes = ""
     /// Split DNS (split tunnel only): domains answered by the VPN's DNS servers ("collega.co.id").
     public var dnsDomains = ""
@@ -44,6 +45,8 @@ public struct Profile: Codable, Equatable, Identifiable {
     }
 
     public var routeList: [String] { tokens(routes) }
+    public var routeSubnets: [String] { routeList.compactMap(parseCIDR) }
+    public var routeHosts: [String] { routeList.filter { parseCIDR($0) == nil } }
     public var domainList: [String] { tokens(dnsDomains) }
     public var isFullTunnel: Bool { routeList.isEmpty }
 
@@ -51,7 +54,7 @@ public struct Profile: Codable, Equatable, Identifiable {
     public var problem: String? {
         if server.isEmpty || server.contains(where: { $0.isWhitespace || $0 == "/" }) { return "Server is required" }
         if port == 0 { return "Port is required" }
-        if let bad = routeList.first(where: { parseCIDR($0) == nil }) { return "Invalid subnet: \(bad)" }
+        if let bad = routeList.first(where: { parseCIDR($0) == nil && !isHostname($0) }) { return "Invalid subnet or hostname: \(bad)" }
         if let bad = domainList.first(where: { !isDomainName($0) }) { return "Invalid domain: \(bad)" }
         return nil
     }
@@ -75,6 +78,11 @@ public func isDomainName(_ s: String) -> Bool {
         (1...63).contains(l.count) && l.first != "-" && l.last != "-"
             && l.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
     }
+}
+
+/// A domain name whose last label has a letter: "10.1.2" would otherwise pass and resolve as the address 10.1.0.2.
+public func isHostname(_ s: String) -> Bool {
+    isDomainName(s) && s.split(separator: ".").last.map { $0.contains(where: \.isLetter) } == true
 }
 
 public enum State: String, Codable {
