@@ -10,11 +10,11 @@ cd "$(dirname "$0")/.."
 
 sudo "$SE/vpnserver" start
 for _ in $(seq 30); do nc -z 127.0.0.1 5555 2>/dev/null && break; sleep 1; done
-vpncmd() { "$SE/vpncmd" localhost:5555 /SERVER "$@" >/dev/null; }
+vpncmd() { "$SE/vpncmd" localhost:5555 /SERVER "$@"; }
 vpncmd /CMD SstpEnable yes
-vpncmd /HUB:DEFAULT /CMD UserCreate test /GROUP:none /REALNAME:none /NOTE:none
-vpncmd /HUB:DEFAULT /CMD UserPasswordSet test /PASSWORD:e2e-pass
-vpncmd /HUB:DEFAULT /CMD SecureNatEnable
+vpncmd /ADMINHUB:DEFAULT /CMD UserCreate test /GROUP:none /REALNAME:none /NOTE:none
+vpncmd /ADMINHUB:DEFAULT /CMD UserPasswordSet test /PASSWORD:e2e-pass
+vpncmd /ADMINHUB:DEFAULT /CMD SecureNatEnable
 PIN=$(openssl s_client -connect 127.0.0.1:443 </dev/null 2>/dev/null | openssl x509 -outform der | shasum -a 256 | cut -d' ' -f1)
 echo "server certificate SHA-256 $PIN"
 
