@@ -11,7 +11,8 @@ cd "$(dirname "$0")/.."
 sudo "$SE/vpnserver" start
 for _ in $(seq 30); do nc -z 127.0.0.1 5555 2>/dev/null && break; sleep 1; done
 vpncmd() { "$SE/vpncmd" localhost:5555 /SERVER "$@"; }
-vpncmd /CMD SstpEnable yes
+vpncmd /CMD ProtoOptionsSet SSTP /NAME:Enabled /VALUE:true # SoftEther 5 (4.x had SstpEnable)
+vpncmd /CMD ProtoOptionsGet SSTP
 vpncmd /ADMINHUB:DEFAULT /CMD UserCreate test /GROUP:none /REALNAME:none /NOTE:none
 vpncmd /ADMINHUB:DEFAULT /CMD UserPasswordSet test /PASSWORD:e2e-pass
 vpncmd /ADMINHUB:DEFAULT /CMD SecureNatEnable
