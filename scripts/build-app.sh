@@ -9,8 +9,10 @@ swift build -c release --product SSTPClient
 swift build -c release --product sstpd
 BIN=$(swift build -c release --show-bin-path)
 APP=build/app.noindex/Sekisho.app
-VERSION=1.0.0 # user-facing; bump BUILD on every release
-BUILD=1
+# SemVer from the latest vX.Y.Z tag; BUILD = commit count, so Sparkle sees every release as newer
+VERSION=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null | sed 's/^v//')
+VERSION=${VERSION:-0.0.0}
+BUILD=$(git rev-list --count HEAD 2>/dev/null || echo 0)
 SIGN_ID="Sekisho Self-Signed"
 KC=$(scripts/make-signing-identity.sh)
 
