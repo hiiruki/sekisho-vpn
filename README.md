@@ -24,7 +24,7 @@ Command Line Tools and Swift Package Manager are enough.
 - **Certificate pinning** for servers whose certificate macOS does not trust (self-signed / private CA), and a warning 14 days before the server certificate expires
 - **Health check**: an internal host that must be reachable through the VPN; the session reconnects when it is not
 - **IPv6 leak protection** in full-tunnel mode
-- **Live logs** (copy all, export to a `.log` file), **speed** and totals, **latency** to the server, a 60-second **speed chart**, connection **duration**, **session history**
+- **Live logs** (copy all, export to a `.log` file), **speed** and totals, **latency** to the server, a 60-second **speed chart**, connection **duration**, **session history** (kept by the helper, so also while the app is closed)
 - **Diagnostics…**: one `.log` with the log, routes, DNS and interfaces for your VPN administrator (no passwords)
 - **Profile files**: export a profile as `.sekisho` (without the password) for colleagues; import or double-click to add
 - **Links** for Shortcuts, Raycast or Focus filters: `sekisho://connect?profile=Name`, `sekisho://disconnect`, `sekisho://toggle`
@@ -58,6 +58,7 @@ Other build entry points:
 ```sh
 scripts/build-app.sh          # just the app -> build/app.noindex/Sekisho.app (".noindex" keeps it out of Launchpad)
 swift run selftest            # RFC 2759/3079 vectors, SSTP framing, scripted PPP exchange, input validation
+scripts/e2e.sh <softether>    # real tunnel against a local SoftEther VPN Server (needs sudo; CI runs it)
 sudo scripts/install-daemon.sh .build/release/sstpd   # install the helper by hand
 sudo scripts/uninstall-daemon.sh                      # remove the helper (then delete the app)
 scripts/release.sh            # DMG + appcast.xml as a GitHub release for the tag at HEAD (CI runs this)
@@ -76,9 +77,17 @@ git tag -s v1.1.0 -m "Sekisho 1.1.0" && git push origin v1.1.0
 
 `.github/workflows/release.yml` then checks that the tag is signed by Hiiruki, runs the selftest, builds and signs
 the app, and publishes the DMG and `appcast.xml` as a GitHub Release, which installed copies pick up through Sparkle.
+The release notes come from the `feat`, `fix` and breaking commits since the previous tag (`scripts/release-notes.sh`):
+on the GitHub release, with the DMG's SHA-256, and in Sparkle's update dialog.
 It uses two repository secrets: `SEKISHO_SIGNING_P12` (the self-signed identity, so CI builds keep the same code
 signature as local ones) and `SPARKLE_ED_KEY` (the EdDSA private key; public half `SUPublicEDKey` in `build-app.sh`).
 Keep an offline backup of both: without the Sparkle key, installed copies can no longer be updated.
+
+Every push to `main` and every pull request also runs `.github/workflows/e2e.yml`: a real SSTP tunnel against a
+SoftEther VPN Server on the runner (pinned certificate, crypto binding, MS-CHAPv2, routes, hostname routing, cleanup,
+session history). What needs a real server, Wi-Fi or a person is in [docs/TESTING.md](docs/TESTING.md). Dependabot
+proposes Sparkle and GitHub Actions updates weekly. `main` and the `v*` tags are protected: signed commits only, no
+force-push, tags cannot be moved or deleted.
 
 ## Using profiles
 
