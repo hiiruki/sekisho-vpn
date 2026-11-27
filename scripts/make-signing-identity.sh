@@ -27,4 +27,6 @@ if [ ! -f "$KC" ]; then
   echo "Created $NAME in $KC" >&2
 fi
 security unlock-keychain -p "$PASS" "$KC"
+# codesign reaches the private key only through the search list, even with --keychain
+security list-keychains -d user | grep -q "$KC" || security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
 echo "$KC"
