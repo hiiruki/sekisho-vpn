@@ -37,8 +37,9 @@ struct SSTPClientApp: App {
         } label: {
             if vpn.status.state == .connected {
                 Image(nsImage: menuBarSpeedImage(rx: vpn.status.rxRate, tx: vpn.status.txRate))
+                    .accessibilityLabel(Text("VPN connected, down \(speed(vpn.status.rxRate)), up \(speed(vpn.status.txRate))"))
             } else {
-                Image(systemName: "lock.shield")
+                Image(systemName: "lock.shield").accessibilityLabel(Text("VPN disconnected"))
             }
         }
         .menuBarExtraStyle(.window)

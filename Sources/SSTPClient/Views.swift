@@ -25,14 +25,15 @@ struct ContentView: View {
                 Picker("Profile", selection: $vpn.selectedID) {
                     ForEach(vpn.profiles) { p in Text(p.name.isEmpty ? p.server : p.name).tag(p.id) }
                 }
-                Button { vpn.addProfile() } label: { Image(systemName: "plus") }.help("Add profile")
-                Button { vpn.removeCurrentProfile() } label: { Image(systemName: "minus") }
+                Button { vpn.addProfile() } label: { Label("Add profile", systemImage: "plus").labelStyle(.iconOnly) }
+                    .help("Add profile")
+                Button { vpn.removeCurrentProfile() } label: { Label("Remove this profile", systemImage: "minus").labelStyle(.iconOnly) }
                     .help("Remove this profile").disabled(vpn.profiles.count < 2)
                 Menu {
                     Button("Import Profile…") { vpn.importProfile() }
                     Button("Export Profile…") { vpn.exportProfile() }
                 } label: {
-                    Image(systemName: "square.and.arrow.up.on.square")
+                    Label("Share profiles", systemImage: "square.and.arrow.up.on.square").labelStyle(.iconOnly)
                 }
                 .menuStyle(.borderlessButton).fixedSize()
                 .help("Share profiles as .sekisho files (without passwords)")

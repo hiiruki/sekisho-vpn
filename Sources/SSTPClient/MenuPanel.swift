@@ -12,6 +12,7 @@ struct MenuPanel: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: connected ? "lock.shield.fill" : "lock.shield")
+                    .accessibilityHidden(true) // the status line next to it says the same
                     .font(.title2)
                     .foregroundStyle(connected ? Color.green : Color.secondary)
                 VStack(alignment: .leading, spacing: 2) {

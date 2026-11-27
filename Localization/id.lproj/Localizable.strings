@@ -115,3 +115,6 @@
 "Update the helper?" = "Perbarui helper?";
 "Sekisho was updated and its root helper (sstpd) is now older than the app, so the VPN cannot connect until it is updated too. This asks for an admin password and drops an active VPN." = "Sekisho sudah diperbarui dan helper root-nya (sstpd) kini lebih lama dari app, jadi VPN tidak bisa tersambung sampai helper ikut diperbarui. Langkah ini meminta password admin dan memutus VPN yang aktif.";
 "Update Helper" = "Perbarui Helper";
+"Share profiles" = "Bagikan profil";
+"VPN connected, down %@, up %@" = "VPN tersambung, unduh %@, unggah %@";
+"VPN disconnected" = "VPN tidak tersambung";
