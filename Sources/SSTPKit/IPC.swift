@@ -5,7 +5,7 @@ import Foundation
 
 public let daemonSocketPath = ProcessInfo.processInfo.environment["SSTPD_SOCKET"] ?? "/var/run/sekisho.sock"
 /// Bump when Event/Status or helper behavior change, so the GUI asks to update the installed helper.
-public let protocolVersion = 6
+public let protocolVersion = 7
 
 public struct Profile: Codable, Equatable, Identifiable {
     public var id = UUID()
@@ -122,20 +122,42 @@ public struct Status: Codable, Equatable {
     public init() {}
 }
 
+/// One connected stretch: from "connected" until the tunnel went down on its own (dropped) or was disconnected.
+public struct Session: Codable, Identifiable, Equatable {
+    public var id = UUID()
+    public var profile: String
+    public var start: Double, end: Double // epoch seconds
+    public var rx: UInt64, tx: UInt64
+    public var dropped: Bool
+    public var reason: String
+
+    public init(profile: String, start: Double, end: Double, rx: UInt64, tx: UInt64, dropped: Bool, reason: String) {
+        self.profile = profile
+        self.start = start
+        self.end = end
+        self.rx = rx
+        self.tx = tx
+        self.dropped = dropped
+        self.reason = reason
+    }
+}
+
 public struct Event: Codable {
     public var v: Int? // nil from helpers older than protocolVersion 2
     public var status: Status?
     public var log: [String]?
+    public var sessions: [Session]? // newest first; on connect and whenever the history changes
 
-    public init(status: Status? = nil, log: [String]? = nil) {
+    public init(status: Status? = nil, log: [String]? = nil, sessions: [Session]? = nil) {
         v = protocolVersion
         self.status = status
         self.log = log
+        self.sessions = sessions
     }
 }
 
 public struct Request: Codable {
-    public enum Cmd: String, Codable { case connect, disconnect, status, pauseKillSwitch }
+    public enum Cmd: String, Codable { case connect, disconnect, status, pauseKillSwitch, clearHistory }
     public var cmd: Cmd
     public var profile: Profile?
 

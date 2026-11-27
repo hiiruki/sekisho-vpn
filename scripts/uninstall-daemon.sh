@@ -5,5 +5,5 @@ for LABEL in moe.hiiruki.sekisho.helper com.sstpvpn.sstpd; do
   launchctl bootout system/$LABEL 2>/dev/null
   rm -f /Library/LaunchDaemons/$LABEL.plist /Library/PrivilegedHelperTools/$LABEL
 done
-rm -f /var/run/sekisho.sock /var/run/sstpd.sock
+rm -f /var/run/sekisho.sock /var/run/sstpd.sock /var/db/sekisho.sessions.json
 echo "Sekisho helper removed"

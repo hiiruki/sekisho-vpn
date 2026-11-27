@@ -12,16 +12,6 @@ struct Sample: Identifiable {
     let rx: Double, tx: Double
 }
 
-/// One connected stretch: from "connected" until the tunnel went down (dropped) or the user disconnected.
-struct Session: Codable, Identifiable {
-    var id = UUID()
-    var profile: String
-    var start: Double, end: Double // epoch seconds
-    var rx: UInt64, tx: UInt64
-    var dropped: Bool
-    var reason: String
-}
-
 /// Shows banners even while our window is frontmost.
 final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationPresenter()
@@ -54,9 +44,7 @@ final class VPNModel: ObservableObject {
     @Published var trustedNetworks: String { didSet { defaults.set(trustedNetworks, forKey: "trustedNetworks") } }
     @Published var currentSSID: String?
     @Published var wifiNameHidden = false // on Wi-Fi, but macOS hides the name (no Location permission)
-    @Published var sessions: [Session] { // newest first
-        didSet { defaults.set(try? JSONEncoder().encode(sessions), forKey: "sessions") }
-    }
+    @Published var sessions: [Session] = [] // kept by the helper, newest first
 
     private let defaults = UserDefaults.standard
     private let link = DaemonLink()
@@ -93,7 +81,7 @@ final class VPNModel: ObservableObject {
         connectOnLaunch = src.bool(forKey: "connectOnLaunch")
         autoConnectUntrusted = defaults.bool(forKey: "autoConnectUntrusted")
         trustedNetworks = defaults.string(forKey: "trustedNetworks") ?? ""
-        sessions = defaults.data(forKey: "sessions").flatMap { try? JSONDecoder().decode([Session].self, from: $0) } ?? []
+        defaults.removeObject(forKey: "sessions") // 1.1 kept the history in the app; the helper keeps it now
         autoConnectPending = src.bool(forKey: "connectOnLaunch")
         saveProfiles(old: profiles) // persists migrated profiles here; passwords are already in the Keychain
         defaults.set(selectedID.uuidString, forKey: "selectedProfile")
@@ -156,7 +144,6 @@ final class VPNModel: ObservableObject {
     private func apply(_ e: Event?) {
         helperReachable = e != nil
         guard let e else {
-            if seenStatus { recordSession(from: status, to: Status()) } // helper stopped (update, uninstall)
             status = Status()
             replaceLogs = true
             seenStatus = false
@@ -169,10 +156,7 @@ final class VPNModel: ObservableObject {
             DispatchQueue.main.async { self.offerHelperUpdate() } // a modal alert, so not from inside event handling
         }
         if let s = e.status {
-            if seenStatus {
-                notifyTransition(from: status, to: s)
-                recordSession(from: status, to: s)
-            }
+            if seenStatus { notifyTransition(from: status, to: s) }
             seenStatus = true
             status = s
             if s.state == .connected, !certWarned, let w = certWarning { // once per session, not per reconnect
@@ -194,6 +178,7 @@ final class VPNModel: ObservableObject {
             }
             autoConnectIfUntrusted() // also covers networks seen before the helper answered
         }
+        if let ss = e.sessions { sessions = ss }
         if let l = e.log {
             if replaceLogs { logs = l } else { logs += l }
             replaceLogs = false
@@ -201,13 +186,7 @@ final class VPNModel: ObservableObject {
         }
     }
 
-    // shortcut: the app records sessions, so those while it is not running are missing; move this into the helper if needed
-    private func recordSession(from a: Status, to b: Status) {
-        guard a.state == .connected, b.state != .connected, let since = a.since else { return }
-        sessions.insert(Session(profile: a.profileName ?? "", start: since, end: Date().timeIntervalSince1970,
-                                rx: a.rxBytes, tx: a.txBytes, dropped: b.state == .connecting, reason: b.message), at: 0)
-        if sessions.count > 200 { sessions.removeLast(sessions.count - 200) }
-    }
+    func clearHistory() { link.send(Request(.clearHistory)) }
 
     private func notifyTransition(from a: Status, to b: Status) {
         guard a.state != b.state else { return }

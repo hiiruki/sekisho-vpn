@@ -23,6 +23,9 @@ final class Server {
     private var killSwitchPausedUntil: Date? // network login page (captive portal) in progress
     private var pauseEnd: DispatchWorkItem?
     private let clientRequirement: SecRequirement?
+    private var history: [Session] = [] // newest first, at most 200
+    private var connectedStatus: Status? // latest status of the tunnel while it is up, for its history entry
+    private static let historyFile = "/var/db/sekisho.sessions.json"
 
     init(clientRequirement: String?) {
         var req: SecRequirement?
@@ -36,6 +39,7 @@ final class Server {
     func run() {
         logSink = { [weak self] line in self?.q.async { self?.appendLog(line) } }
         recoverAfterCrash()
+        history = (try? JSONDecoder().decode([Session].self, from: Data(contentsOf: URL(fileURLWithPath: Self.historyFile)))) ?? []
 
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         unlink(daemonSocketPath)
@@ -64,6 +68,7 @@ final class Server {
             s.setEventHandler { [self] in
                 session = nil
                 retry?.cancel()
+                recordSession(dropped: false, reason: "Helper stopped")
                 let quit = { [self] in killSwitch.disable(); exit(0) }
                 guard let t = tunnel else { return quit() }
                 t.onEnded = { _, _ in quit() } // tear routes/DNS down first
@@ -109,7 +114,7 @@ final class Server {
         }
         s.resume()
         clients[c] = s
-        write(encodeLine(Event(status: status, log: backlog)), to: c)
+        write(encodeLine(Event(status: status, log: backlog, sessions: history)), to: c)
     }
 
     private func consoleUID() -> uid_t? {
@@ -161,6 +166,10 @@ final class Server {
             pauseEnd = w
             q.asyncAfter(deadline: .now() + 120, execute: w)
             publish(status)
+        case .clearHistory:
+            history = []
+            saveHistory()
+            broadcast(Event(sessions: history))
         }
     }
 
@@ -192,6 +201,7 @@ final class Server {
             guard let self else { return }
             let cert = t?.untrustedCert
             self.tunnel = nil
+            self.recordSession(dropped: message != nil, reason: message ?? "") // nil = ended on request
             // reconnect only a session that was up and dropped on its own; first-attempt errors go to the user
             guard let message, retryable, let p = self.session, p.autoReconnect, let ip = self.lastServerIP else {
                 return self.endSession(message, untrustedCert: cert)
@@ -233,8 +243,26 @@ final class Server {
     private func publish(_ s: Status) {
         var s = s
         s.killSwitchPausedUntil = killSwitchPausedUntil?.timeIntervalSince1970
+        if s.state == .connected { connectedStatus = s }
         status = s
         broadcast(Event(status: s))
+    }
+
+    /// History entry for the tunnel that just ended, if it had been up. Kept by the helper in a root-owned file, so
+    /// sessions are recorded while no GUI runs.
+    private func recordSession(dropped: Bool, reason: String) {
+        guard let c = connectedStatus, let since = c.since else { return }
+        connectedStatus = nil
+        history.insert(Session(profile: c.profileName ?? "", start: since, end: Date().timeIntervalSince1970,
+                               rx: c.rxBytes, tx: c.txBytes, dropped: dropped, reason: reason), at: 0)
+        if history.count > 200 { history.removeLast(history.count - 200) }
+        saveHistory()
+        broadcast(Event(sessions: history))
+    }
+
+    private func saveHistory() {
+        guard let data = try? JSONEncoder().encode(history) else { return }
+        FileManager.default.createFile(atPath: Self.historyFile, contents: data, attributes: [.posixPermissions: 0o600])
     }
 
     /// Keeps the log under 1 MB plus one previous file. Done here rather than by newsyslog because
