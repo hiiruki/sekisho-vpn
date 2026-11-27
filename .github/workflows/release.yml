@@ -1,0 +1,39 @@
+name: Release
+
+# Push a signed tag vX.Y.Z (git tag -s) to publish: selftest, build, sign, DMG, appcast, GitHub Release.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # tags for VERSION, full history for BUILD (commit count)
+
+      - name: Require a tag signed by Hiiruki
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          sha=$(gh api "repos/$REPO/git/refs/tags/$GITHUB_REF_NAME" --jq '.object | select(.type == "tag") | .sha')
+          [ -n "$sha" ] || { echo "::error::$GITHUB_REF_NAME is not an annotated, signed tag"; exit 1; }
+          ok=$(gh api "repos/$REPO/git/tags/$sha" --jq '.verification.verified and .tagger.email == "hi@hiiruki.moe"')
+          [ "$ok" = true ] || { echo "::error::$GITHUB_REF_NAME must be signed by Hiiruki (hi@hiiruki.moe) with a key on the GitHub account"; exit 1; }
+
+      - name: Selftest
+        run: swift run selftest
+
+      - name: Build and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SEKISHO_SIGNING_P12: ${{ secrets.SEKISHO_SIGNING_P12 }}
+          SPARKLE_ED_KEY: ${{ secrets.SPARKLE_ED_KEY }}
+        run: |
+          printf %s "$SPARKLE_ED_KEY" > "$RUNNER_TEMP/sparkle.key"
+          SPARKLE_KEY_FILE="$RUNNER_TEMP/sparkle.key" scripts/release.sh

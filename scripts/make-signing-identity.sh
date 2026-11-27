@@ -10,13 +10,16 @@ PASS=sekisho # guards nothing beyond the file's permissions: the key only signs 
 
 if [ ! -f "$KC" ]; then
   TMP=$(mktemp -d)
-  trap 'rm -rf "$TMP"' EXIT
-  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=$NAME" \
-    -keyout "$TMP/key.pem" -out "$TMP/cert.pem" \
-    -addext "basicConstraints=critical,CA:false" \
-    -addext "keyUsage=critical,digitalSignature" \
-    -addext "extendedKeyUsage=critical,codeSigning" 2>/dev/null
-  openssl pkcs12 -export -inkey "$TMP/key.pem" -in "$TMP/cert.pem" -out "$TMP/id.p12" -passout pass:sekisho
+  if [ -n "$SEKISHO_SIGNING_P12" ]; then # CI: the same identity as local builds, from a secret (base64 .p12, password "sekisho")
+    printf %s "$SEKISHO_SIGNING_P12" | base64 --decode > "$TMP/id.p12"
+  else
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=$NAME" \
+      -keyout "$TMP/key.pem" -out "$TMP/cert.pem" \
+      -addext "basicConstraints=critical,CA:false" \
+      -addext "keyUsage=critical,digitalSignature" \
+      -addext "extendedKeyUsage=critical,codeSigning" 2>/dev/null
+    openssl pkcs12 -export -inkey "$TMP/key.pem" -in "$TMP/cert.pem" -out "$TMP/id.p12" -passout pass:sekisho
+  fi
   security create-keychain -p "$PASS" "$KC"
   security set-keychain-settings "$KC" # no auto-lock
   security import "$TMP/id.p12" -k "$KC" -P sekisho -T /usr/bin/codesign >/dev/null

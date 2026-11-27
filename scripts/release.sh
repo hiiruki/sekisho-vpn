@@ -1,7 +1,7 @@
 #!/bin/sh
-# Publishes a GitHub release (DMG + appcast.xml); installed copies find it through Sparkle
-# (SUFeedURL = releases/latest/download/appcast.xml). Bump VERSION and BUILD in build-app.sh first.
-# Needs `gh auth login` and the Sparkle EdDSA private key in the login keychain (generate_keys, once per maintainer).
+# Publishes a GitHub release (DMG + appcast.xml) for the vX.Y.Z tag at HEAD; installed copies find it through Sparkle
+# (SUFeedURL = releases/latest/download/appcast.xml). Normally run by .github/workflows/release.yml when a signed tag
+# is pushed. Needs `gh` auth and the Sparkle EdDSA private key: SPARKLE_KEY_FILE, else the login keychain.
 set -e
 cd "$(dirname "$0")/.."
 REPO=hiiruki/sekisho-vpn
@@ -11,5 +11,8 @@ OUT=build/release
 rm -rf "$OUT" && mkdir -p "$OUT"
 cp "build/Sekisho-$VERSION.dmg" "$OUT/"
 # feed holds only this version: Sparkle just needs the newest item
-.build/artifacts/sparkle/Sparkle/bin/generate_appcast --download-url-prefix "https://github.com/$REPO/releases/download/v$VERSION/" "$OUT"
-gh release create "v$VERSION" "$OUT/Sekisho-$VERSION.dmg" "$OUT/appcast.xml" --repo "$REPO" --title "Sekisho $VERSION" --generate-notes
+.build/artifacts/sparkle/Sparkle/bin/generate_appcast ${SPARKLE_KEY_FILE:+--ed-key-file "$SPARKLE_KEY_FILE"} \
+  --download-url-prefix "https://github.com/$REPO/releases/download/v$VERSION/" "$OUT"
+# --verify-tag: release only a pushed (signed) tag; gh would otherwise create an unsigned one
+gh release create "v$VERSION" "$OUT/Sekisho-$VERSION.dmg" "$OUT/appcast.xml" --repo "$REPO" --title "Sekisho $VERSION" \
+  --generate-notes --verify-tag
