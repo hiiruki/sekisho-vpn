@@ -27,8 +27,8 @@ jobs:
           [ "$ok" = true ] || { echo "::error::$GITHUB_REF_NAME must be signed by Hiiruki (hi@hiiruki.moe) with a key on the GitHub account"; exit 1; }
 
       - name: Selftest
-        # debug binaries signed with get-task-allow are killed (SIGKILL) on the runner: swiftlang/swift-package-manager#7994
-        run: swift run --disable-get-task-allow-entitlement selftest
+        # `swift run` itself is SIGKILLed on the runner (exit 137) while the same binary run directly passes
+        run: swift build --product selftest && "$(swift build --show-bin-path)/selftest"
 
       - name: Build and publish
         env:
