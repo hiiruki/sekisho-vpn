@@ -20,6 +20,7 @@ rm -rf build/app.noindex # also drops apps built under older names
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN/SSTPClient" "$APP/Contents/MacOS/"
 cp "$BIN/sstpd" scripts/install-daemon.sh scripts/uninstall-daemon.sh "$APP/Contents/Resources/"
+cp -R Localization/*.lproj "$APP/Contents/Resources/"
 ditto "$BIN/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
 install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/SSTPClient"
 
@@ -45,6 +46,8 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$BUILD</string>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>id</string></array>
   <key>NSHumanReadableCopyright</key><string>© 2026 Hiiruki · hiiruki.moe</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>

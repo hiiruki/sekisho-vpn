@@ -55,7 +55,7 @@ func showAbout() {
     let center = NSMutableParagraphStyle()
     center.alignment = .center
     let font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
-    let credits = NSMutableAttributedString(string: "SSTP VPN client for macOS\n", attributes: [
+    let credits = NSMutableAttributedString(string: String(localized: "SSTP VPN client for macOS") + "\n", attributes: [
         .font: font, .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: center,
     ])
     credits.append(NSAttributedString(string: "hiiruki.moe", attributes: [
@@ -334,19 +334,21 @@ final class VPNModel: ObservableObject {
         let server = profiles.first { $0.name == name }?.server ?? name
         switch b.state {
         case .connected:
-            notify(dropped ? "Reconnected to \(server)" : "Connected to \(server)", b.localIP.map { "VPN address \($0)" } ?? "")
+            notify(dropped ? String(localized: "Reconnected to \(server)") : String(localized: "Connected to \(server)"),
+                   b.localIP.map { String(localized: "VPN address \($0)") } ?? "")
             dropped = false
         case .connecting where a.state == .connected:
             dropped = true
-            notify("Connection to \(server) lost", b.message)
+            notify(String(localized: "Connection to \(server) lost"), b.message)
         case .disconnected:
             dropped = false
             if b.untrustedCert != nil {
-                notify("Couldn't connect to \(server)", "The server's certificate is not trusted. Open Sekisho to review it.")
+                notify(String(localized: "Couldn't connect to \(server)"),
+                       String(localized: "The server's certificate is not trusted. Open Sekisho to review it."))
             } else if b.message.isEmpty || a.state == .connected { // user-requested, or an established tunnel ended
-                notify("Disconnected from \(server)", b.message)
+                notify(String(localized: "Disconnected from \(server)"), b.message)
             } else { // ended before ever connecting: resolve, TLS, auth, timeout…
-                notify("Couldn't connect to \(server)", b.message)
+                notify(String(localized: "Couldn't connect to \(server)"), b.message)
             }
         default:
             break
@@ -382,12 +384,12 @@ final class VPNModel: ObservableObject {
     var canConnect: Bool { helperReachable && !helperOutdated && current.problem == nil }
 
     var statusLine: String {
-        guard helperReachable else { return "Helper not running" }
-        guard !helperOutdated else { return "Helper needs an update" }
+        guard helperReachable else { return String(localized: "Helper not running") }
+        guard !helperOutdated else { return String(localized: "Helper needs an update") }
         switch status.state {
-        case .connected: return "Connected" + (status.localIP.map { " — \($0)" } ?? "")
+        case .connected: return status.localIP.map { String(localized: "Connected — \($0)") } ?? String(localized: "Connected")
         case .connecting, .disconnecting: return status.message
-        case .disconnected: return status.message.isEmpty ? "Disconnected" : status.message
+        case .disconnected: return status.message.isEmpty ? String(localized: "Disconnected") : status.message
         }
     }
 
@@ -431,7 +433,7 @@ final class VPNModel: ObservableObject {
         case "connect":
             if let name {
                 guard let p = profiles.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) else {
-                    return notify("Unknown profile", "No profile named “\(name)”.")
+                    return notify(String(localized: "Unknown profile"), String(localized: "No profile named “\(name)”."))
                 }
                 if !busy { selectedID = p.id }
             }
@@ -441,7 +443,7 @@ final class VPNModel: ObservableObject {
         case "toggle":
             toggleVPN()
         default:
-            notify("Unknown link", url.absoluteString)
+            notify(String(localized: "Unknown link"), url.absoluteString)
         }
     }
 
@@ -456,7 +458,7 @@ final class VPNModel: ObservableObject {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = (p.name.isEmpty ? "VPN" : p.name) + ".sekisho"
         panel.allowedContentTypes = [Self.profileType]
-        panel.message = "Contains the server and settings of “\(p.name)”, not the password."
+        panel.message = String(localized: "Contains the server and settings of “\(p.name)”, not the password.")
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let enc = JSONEncoder()
@@ -464,7 +466,7 @@ final class VPNModel: ObservableObject {
         do {
             try enc.encode(p).write(to: url, options: .atomic)
         } catch {
-            installError = "Export failed: \(error.localizedDescription)"
+            installError = String(localized: "Export failed: \(error.localizedDescription)")
         }
     }
 
@@ -484,18 +486,20 @@ final class VPNModel: ObservableObject {
         NSApp.activate(ignoringOtherApps: true)
         guard let data = try? Data(contentsOf: url), data.count < 64 << 10,
               var p = try? JSONDecoder().decode(Profile.self, from: data) else {
-            alert("Cannot import “\(url.lastPathComponent)”", "The file is not a Sekisho profile.")
+            alert(String(localized: "Cannot import “\(url.lastPathComponent)”"), String(localized: "The file is not a Sekisho profile."))
             return
         }
         if let problem = p.problem {
-            alert("Cannot import “\(p.name)”", problem)
+            alert(String(localized: "Cannot import “\(p.name)”"), problem)
             return
         }
-        var info = "Server: \(p.server):\(p.port)"
+        let address = "\(p.server):\(p.port)"
+        var info = String(localized: "Server: \(address)")
         if let pin = p.pinnedCert {
-            info += "\n\nThis profile trusts a server certificate that macOS does not:\nSHA-256 \(fingerprint(pin.replacingOccurrences(of: ":", with: "")))\n\nImport it only if the file comes from your VPN administrator."
+            let sha = fingerprint(pin.replacingOccurrences(of: ":", with: ""))
+            info += "\n\n" + String(localized: "This profile trusts a server certificate that macOS does not:\nSHA-256 \(sha)\n\nImport it only if the file comes from your VPN administrator.")
         }
-        guard alert("Import “\(p.name)”?", info, confirm: "Import") else { return }
+        guard alert(String(localized: "Import “\(p.name)”?"), info, confirm: String(localized: "Import")) else { return }
         p.id = UUID()
         p.password = ""
         if profiles.contains(where: { $0.name == p.name }) { p.name += " (imported)" } // sessions are matched by name
@@ -511,7 +515,7 @@ final class VPNModel: ObservableObject {
         a.informativeText = text
         if let confirm {
             a.addButton(withTitle: confirm)
-            a.addButton(withTitle: "Cancel")
+            a.addButton(withTitle: String(localized: "Cancel"))
         }
         return a.runModal() == .alertFirstButtonReturn
     }
@@ -553,7 +557,7 @@ final class VPNModel: ObservableObject {
         do {
             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
         } catch {
-            installError = "Launch at login: \(error.localizedDescription)"
+            installError = String(localized: "Launch at login: \(error.localizedDescription)")
         }
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
@@ -573,7 +577,7 @@ final class VPNModel: ObservableObject {
             do {
                 try contents().write(to: url, atomically: true, encoding: .utf8)
             } catch {
-                await MainActor.run { self.installError = "Export failed: \(error.localizedDescription)" }
+                await MainActor.run { self.installError = String(localized: "Export failed: \(error.localizedDescription)") }
             }
         }
     }
@@ -602,7 +606,7 @@ final class VPNModel: ObservableObject {
         \(String(decoding: (try? enc.encode(profile)) ?? Data(), as: UTF8.self))
         """
         let log = logs.joined(separator: "\n")
-        saveLog("diagnostics", message: "Contains the server, username, addresses, routes and DNS settings; no passwords.") {
+        saveLog("diagnostics", message: String(localized: "Contains the server, username, addresses, routes and DNS settings; no passwords.")) {
             var out = head
             for (path, args) in [("/usr/sbin/netstat", ["-rn", "-f", "inet"]), ("/usr/sbin/scutil", ["--dns"]), ("/sbin/ifconfig", [])] {
                 out += "\n\n== \(([path] + args).joined(separator: " "))\n" + commandOutput(path, args)
@@ -615,10 +619,10 @@ final class VPNModel: ObservableObject {
 
     func uninstallHelper() {
         let a = NSAlert()
-        a.messageText = "Uninstall the helper?"
-        a.informativeText = "This disconnects the VPN and removes the root helper (sstpd). Sekisho cannot connect until you install it again. Your profiles are kept."
-        a.addButton(withTitle: "Uninstall").hasDestructiveAction = true
-        a.addButton(withTitle: "Cancel")
+        a.messageText = String(localized: "Uninstall the helper?")
+        a.informativeText = String(localized: "This disconnects the VPN and removes the root helper (sstpd). Sekisho cannot connect until you install it again. Your profiles are kept.")
+        a.addButton(withTitle: String(localized: "Uninstall")).hasDestructiveAction = true
+        a.addButton(withTitle: String(localized: "Cancel"))
         NSApp.activate(ignoringOtherApps: true)
         guard a.runModal() == .alertFirstButtonReturn else { return }
         runAsRoot("uninstall-daemon.sh")
