@@ -44,6 +44,7 @@ public final class Tunnel {
     private var echoSent: Date? // pending SSTP echo, for the latency readout
     private var ticks = 0
     private var routedHosts: Set<String> = [] // addresses of split-tunnel hostnames already routed
+    private var healthFailures = 0
 
     private static let serviceKey = "State:/Network/Service/Sekisho"
     private static let ipv6Anchor = "com.apple/sekisho.ipv6"
@@ -222,6 +223,7 @@ public final class Tunnel {
         sendEcho()
         ticks += 1
         if ticks % 30 == 0 { routeHosts() } // every 5 min: follow DNS changes of split-tunnel hostnames
+        if ticks % 3 == 0 { checkHealth() }
         if Date().timeIntervalSince(lastRx) > 45 { finish("Server stopped responding") }
     }
 
@@ -315,6 +317,7 @@ public final class Tunnel {
             statsTimer = t
             sendEcho() // a latency reading right away instead of after the first 10 s tick
             routeHosts()
+            q.asyncAfter(deadline: .now() + 3) { [weak self] in self?.checkHealth() } // after hostname routes are in
         } catch {
             finish("Network setup failed: \(error)")
         }
@@ -371,6 +374,40 @@ public final class Tunnel {
                 }
             }
         }
+    }
+
+    /// Health check: a TCP connection to the profile's internal host proves routes and DNS work, not just the tunnel.
+    /// Three failures in a row (90 s) reconnect, when auto-reconnect is on.
+    private func checkHealth() {
+        guard !ended, status.state == .connected, let target = profile.healthTarget,
+              let port = NWEndpoint.Port(rawValue: target.port) else { return }
+        let c = NWConnection(host: NWEndpoint.Host(target.host), port: port, using: .tcp)
+        var done = false
+        let result = { [weak self] (ok: Bool) in
+            guard !done else { return }
+            done = true
+            c.stateUpdateHandler = nil // breaks the connection -> handler -> connection cycle
+            c.cancel()
+            self?.healthResult(ok)
+        }
+        c.stateUpdateHandler = { s in
+            switch s {
+            case .ready: result(true)
+            case .failed, .waiting: result(false)
+            default: break
+            }
+        }
+        c.start(queue: q)
+        q.asyncAfter(deadline: .now() + 5) { result(false) }
+    }
+
+    private func healthResult(_ ok: Bool) {
+        guard !ended else { return }
+        if ok, healthFailures > 0 { log("Health check: \(profile.healthCheck) reachable again") }
+        if !ok, healthFailures == 0 { log("Health check: cannot reach \(profile.healthCheck)") }
+        healthFailures = ok ? 0 : healthFailures + 1
+        status.reachable = ok // published with the next rate sample
+        if healthFailures >= 3, profile.autoReconnect { finish("Health check failed: \(profile.healthCheck) unreachable for 90 s") }
     }
 
     private func sampleRates() {

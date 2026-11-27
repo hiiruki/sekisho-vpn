@@ -143,6 +143,17 @@ for bad in ["10.1.2", "intra_net.example", "-bad.example", "a.com;reboot"] {
 }
 profile.routes = ""
 
+// Health check target: host or host:port, default 443
+profile.healthCheck = "intranet.example.com"
+check(profile.healthTarget?.host == "intranet.example.com" && profile.healthTarget?.port == 443 && profile.problem == nil)
+profile.healthCheck = "10.0.0.5:8080"
+check(profile.healthTarget?.host == "10.0.0.5" && profile.healthTarget?.port == 8080)
+for bad in ["host:0", "host:99999", "a:b:c", "10.0.0.0/8", "x;y"] {
+    profile.healthCheck = bad
+    check(profile.healthTarget == nil && profile.problem != nil, bad)
+}
+profile.healthCheck = ""
+
 md4Vectors()
 msChapV2Vectors()
 sstpFraming()

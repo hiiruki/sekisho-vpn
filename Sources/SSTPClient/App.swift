@@ -217,6 +217,8 @@ final class VPNModel: ObservableObject {
 
     private var index: Int { profiles.firstIndex { $0.id == selectedID } ?? 0 }
     var current: Profile { profiles[index] }
+    /// The profile of the running session (status carries only its name).
+    var sessionProfile: Profile? { profiles.first { $0.name == status.profileName } }
     var currentBinding: Binding<Profile> {
         Binding(get: { self.profiles[self.index] }, set: { self.profiles[self.index] = $0 })
     }
@@ -456,6 +458,7 @@ struct ContentView: View {
             HStack {
                 if vpn.status.state == .connecting || vpn.status.state == .disconnecting { ProgressView().controlSize(.small) }
                 Text(vpn.statusLine).foregroundStyle(.secondary).lineLimit(2)
+                if let ok = vpn.status.reachable, let host = vpn.sessionProfile?.healthCheck { HealthBadge(host: host, ok: ok) }
                 Spacer()
                 if vpn.busy {
                     Button("Disconnect") { vpn.disconnect() }.disabled(vpn.status.state == .disconnecting)
@@ -517,6 +520,8 @@ struct ProfileForm: View {
                 .disabled(!p.isFullTunnel)
                 .help("Full tunnel only. Stays on through reconnects until you disconnect.")
             Toggle("Reconnect automatically", isOn: $p.autoReconnect)
+            TextField("Health check", text: $p.healthCheck, prompt: Text("optional: intranet.example.com or host:8080"))
+                .help("An internal host that must accept connections through the VPN. Checked every 30 s; after 90 s unreachable the VPN reconnects (with Reconnect automatically).")
             if let pin = p.pinnedCert {
                 LabeledContent("Pinned certificate") {
                     HStack {
@@ -669,6 +674,12 @@ struct MenuPanel: View {
                             Text("latency").foregroundStyle(.secondary)
                         }
                     }
+                    if let ok = vpn.status.reachable, let host = vpn.sessionProfile?.healthCheck {
+                        GridRow {
+                            HealthBadge(host: host, ok: ok)
+                            Text("health check").foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 .font(.callout.monospacedDigit())
             } else if vpn.profiles.count > 1 {
@@ -692,5 +703,18 @@ struct MenuPanel: View {
         }
         .padding(14)
         .frame(width: 300)
+    }
+}
+
+/// ✓/✗ for the health check host of the running session.
+struct HealthBadge: View {
+    let host: String
+    let ok: Bool
+
+    var body: some View {
+        Label(host, systemImage: ok ? "checkmark.circle.fill" : "xmark.octagon.fill")
+            .foregroundStyle(ok ? .green : .red)
+            .lineLimit(1)
+            .help(ok ? "Reachable through the VPN" : "Not reachable through the VPN")
     }
 }

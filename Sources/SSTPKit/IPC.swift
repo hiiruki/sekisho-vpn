@@ -23,6 +23,8 @@ public struct Profile: Codable, Equatable, Identifiable {
     public var dnsDomains = ""
     public var killSwitch = false // full tunnel only
     public var autoReconnect = true
+    /// Internal "host" or "host:port" (default 443) that must accept TCP connections through the tunnel. Empty = no check.
+    public var healthCheck = ""
 
     public init() {}
 
@@ -42,6 +44,7 @@ public struct Profile: Codable, Equatable, Identifiable {
         dnsDomains = try c.decodeIfPresent(String.self, forKey: .dnsDomains) ?? d.dnsDomains
         killSwitch = try c.decodeIfPresent(Bool.self, forKey: .killSwitch) ?? d.killSwitch
         autoReconnect = try c.decodeIfPresent(Bool.self, forKey: .autoReconnect) ?? d.autoReconnect
+        healthCheck = try c.decodeIfPresent(String.self, forKey: .healthCheck) ?? d.healthCheck
     }
 
     public var routeList: [String] { tokens(routes) }
@@ -50,12 +53,20 @@ public struct Profile: Codable, Equatable, Identifiable {
     public var domainList: [String] { tokens(dnsDomains) }
     public var isFullTunnel: Bool { routeList.isEmpty }
 
+    public var healthTarget: (host: String, port: UInt16)? {
+        let parts = healthCheck.trimmingCharacters(in: .whitespaces).split(separator: ":", omittingEmptySubsequences: false).map(String.init)
+        guard (1...2).contains(parts.count), isHostname(parts[0]) || parseCIDR(parts[0]) == parts[0] + "/32",
+              let port = parts.count == 2 ? UInt16(parts[1]) : 443, port > 0 else { return nil }
+        return (parts[0], port)
+    }
+
     /// Checked by the root daemon (trust boundary): routes and domains end up in `route` and `scutil` input.
     public var problem: String? {
         if server.isEmpty || server.contains(where: { $0.isWhitespace || $0 == "/" }) { return "Server is required" }
         if port == 0 { return "Port is required" }
         if let bad = routeList.first(where: { parseCIDR($0) == nil && !isHostname($0) }) { return "Invalid subnet or hostname: \(bad)" }
         if let bad = domainList.first(where: { !isDomainName($0) }) { return "Invalid domain: \(bad)" }
+        if !healthCheck.trimmingCharacters(in: .whitespaces).isEmpty, healthTarget == nil { return "Invalid health check: \(healthCheck)" }
         return nil
     }
 }
@@ -101,6 +112,7 @@ public struct Status: Codable, Equatable {
     public var profileName: String?
     public var untrustedCert: String? // SHA-256 of a server certificate macOS rejected, for the GUI to offer pinning
     public var latency: Double? // ms, round trip of the last SSTP echo to the server
+    public var reachable: Bool? // health check result; nil = none configured or not checked yet
 
     public init() {}
 }
