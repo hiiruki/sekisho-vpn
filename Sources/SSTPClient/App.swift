@@ -18,6 +18,11 @@ struct SSTPClientApp: App {
             ContentView().environmentObject(vpn)
         }
         .windowResizability(.contentSize)
+
+        Window("Session History", id: "history") {
+            HistoryView().environmentObject(vpn)
+        }
+        .defaultSize(width: 760, height: 420)
         .commands {
             CommandGroup(after: .newItem) {
                 Button("Import Profile…") { vpn.importProfile() }
@@ -80,8 +85,10 @@ func compactRate(_ v: Double) -> String {
     return (i > 0 && x < 9.95 ? String(format: "%.1f", x) : String(format: "%.0f", x)) + units[i]
 }
 
-func duration(since: Double) -> String {
-    let s = max(0, Int(Date().timeIntervalSince1970 - since))
+func duration(since: Double) -> String { duration(Date().timeIntervalSince1970 - since) }
+
+func duration(_ seconds: Double) -> String {
+    let s = max(0, Int(seconds))
     return String(format: "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
 }
 
@@ -120,6 +127,16 @@ func menuBarSpeedImage(rx: Double, tx: Double) -> NSImage {
 struct Sample: Identifiable {
     let id: Int
     let rx: Double, tx: Double
+}
+
+/// One connected stretch: from "connected" until the tunnel went down (dropped) or the user disconnected.
+struct Session: Codable, Identifiable {
+    var id = UUID()
+    var profile: String
+    var start: Double, end: Double // epoch seconds
+    var rx: UInt64, tx: UInt64
+    var dropped: Bool
+    var reason: String
 }
 
 /// Shows banners even while our window is frontmost.
@@ -161,6 +178,9 @@ final class VPNModel: ObservableObject {
     @Published var trustedNetworks: String { didSet { defaults.set(trustedNetworks, forKey: "trustedNetworks") } }
     @Published var currentSSID: String?
     @Published var wifiNameHidden = false // on Wi-Fi, but macOS hides the name (no Location permission)
+    @Published var sessions: [Session] { // newest first
+        didSet { defaults.set(try? JSONEncoder().encode(sessions), forKey: "sessions") }
+    }
 
     private let defaults = UserDefaults.standard
     private let link = DaemonLink()
@@ -196,6 +216,7 @@ final class VPNModel: ObservableObject {
         connectOnLaunch = src.bool(forKey: "connectOnLaunch")
         autoConnectUntrusted = defaults.bool(forKey: "autoConnectUntrusted")
         trustedNetworks = defaults.string(forKey: "trustedNetworks") ?? ""
+        sessions = defaults.data(forKey: "sessions").flatMap { try? JSONDecoder().decode([Session].self, from: $0) } ?? []
         autoConnectPending = src.bool(forKey: "connectOnLaunch")
         saveProfiles(old: profiles) // persists migrated profiles here; passwords are already in the Keychain
         defaults.set(selectedID.uuidString, forKey: "selectedProfile")
@@ -258,6 +279,7 @@ final class VPNModel: ObservableObject {
     private func apply(_ e: Event?) {
         helperReachable = e != nil
         guard let e else {
+            if seenStatus { recordSession(from: status, to: Status()) } // helper stopped (update, uninstall)
             status = Status()
             replaceLogs = true
             seenStatus = false
@@ -266,7 +288,10 @@ final class VPNModel: ObservableObject {
         }
         helperOutdated = e.v != protocolVersion
         if let s = e.status {
-            if seenStatus { notifyTransition(from: status, to: s) }
+            if seenStatus {
+                notifyTransition(from: status, to: s)
+                recordSession(from: status, to: s)
+            }
             seenStatus = true
             status = s
             if s.state == .connected, !certWarned, let w = certWarning { // once per session, not per reconnect
@@ -293,6 +318,14 @@ final class VPNModel: ObservableObject {
             replaceLogs = false
             if logs.count > 1000 { logs.removeFirst(logs.count - 1000) }
         }
+    }
+
+    // shortcut: the app records sessions, so those while it is not running are missing; move this into the helper if needed
+    private func recordSession(from a: Status, to b: Status) {
+        guard a.state == .connected, b.state != .connected, let since = a.since else { return }
+        sessions.insert(Session(profile: a.profileName ?? "", start: since, end: Date().timeIntervalSince1970,
+                                rx: a.rxBytes, tx: a.txBytes, dropped: b.state == .connecting, reason: b.message), at: 0)
+        if sessions.count > 200 { sessions.removeLast(sessions.count - 200) }
     }
 
     private func notifyTransition(from a: Status, to b: Status) {
@@ -633,6 +666,7 @@ func commandOutput(_ path: String, _ args: [String]) -> String {
 
 struct ContentView: View {
     @EnvironmentObject var vpn: VPNModel
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -695,6 +729,8 @@ struct ContentView: View {
             HStack(spacing: 20) {
                 Toggle("Launch at login", isOn: Binding(get: { vpn.launchAtLogin }, set: { vpn.setLaunchAtLogin($0) }))
                 Toggle("Connect when the app starts", isOn: $vpn.connectOnLaunch)
+                Spacer()
+                Button("Session History") { openWindow(id: "history") }
             }
             .font(.callout)
 
@@ -974,5 +1010,36 @@ struct CertExpiryWarning: View {
             }
             .font(.caption)
         }
+    }
+}
+
+struct HistoryView: View {
+    @EnvironmentObject var vpn: VPNModel
+
+    var body: some View {
+        VStack(alignment: .leading) {
+            Table(vpn.sessions) {
+                TableColumn("Started") { s in Text(Date(timeIntervalSince1970: s.start).formatted(date: .abbreviated, time: .shortened)) }
+                TableColumn("Profile", value: \.profile)
+                TableColumn("Duration") { s in Text(duration(s.end - s.start)).monospacedDigit() }
+                TableColumn("Down") { s in Text(bytes(Double(s.rx))).monospacedDigit() }
+                TableColumn("Up") { s in Text(bytes(Double(s.tx))).monospacedDigit() }
+                TableColumn("Ended") { s in ending(s).help(s.reason) }
+            }
+            HStack {
+                let drops = vpn.sessions.filter(\.dropped).count
+                Text("\(vpn.sessions.count) sessions, \(drops) dropped, ↓ \(bytes(Double(vpn.sessions.map(\.rx).reduce(0, +)))) ↑ \(bytes(Double(vpn.sessions.map(\.tx).reduce(0, +))))")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Clear History") { vpn.sessions.removeAll() }.disabled(vpn.sessions.isEmpty)
+            }
+        }
+        .padding()
+        .frame(minWidth: 640, minHeight: 300)
+    }
+
+    private func ending(_ s: Session) -> Text {
+        if s.dropped { return Text("Dropped: \(s.reason)") }
+        return s.reason.isEmpty ? Text("Disconnected") : Text(s.reason)
     }
 }
