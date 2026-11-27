@@ -349,6 +349,18 @@ final class VPNModel: ObservableObject {
 
     func disconnect() { link.send(Request(.disconnect)) }
 
+    /// Reconnecting behind the kill switch: a Wi-Fi login page (captive portal) cannot load, so a pause is offered.
+    var killSwitchHolding: Bool {
+        dropped && status.state == .connecting && status.killSwitchPausedUntil == nil
+            && sessionProfile.map { $0.killSwitch && $0.isFullTunnel } == true
+    }
+
+    func pauseKillSwitch() {
+        link.send(Request(.pauseKillSwitch))
+        // plain HTTP, so the Wi-Fi's portal can redirect it to its login page
+        NSWorkspace.shared.open(URL(string: "http://captive.apple.com")!)
+    }
+
     /// Global hotkey: one key to bring the VPN up or down.
     func toggleVPN() {
         if busy { disconnect() } else if canConnect { connect() }
@@ -633,6 +645,8 @@ struct ContentView: View {
 
             ProfileForm(p: vpn.currentBinding).disabled(vpn.busy)
 
+            KillSwitchPauseBanner()
+
             if let cert = vpn.status.untrustedCert, vpn.status.state == .disconnected {
                 CertificatePrompt(sha256: cert)
             }
@@ -837,6 +851,8 @@ struct MenuPanel: View {
                     .disabled(vpn.busy ? vpn.status.state == .disconnecting : !vpn.canConnect)
             }
 
+            KillSwitchPauseBanner()
+
             if connected {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
                     GridRow {
@@ -901,5 +917,24 @@ struct HealthBadge: View {
             .foregroundStyle(ok ? .green : .red)
             .lineLimit(1)
             .help(ok ? "Reachable through the VPN" : "Not reachable through the VPN")
+    }
+}
+
+/// While reconnecting behind the kill switch: offers a 2-minute pause so a Wi-Fi login page can load.
+struct KillSwitchPauseBanner: View {
+    @EnvironmentObject var vpn: VPNModel
+
+    var body: some View {
+        if let until = vpn.status.killSwitchPausedUntil {
+            Label("Kill switch paused until \(Date(timeIntervalSince1970: until).formatted(date: .omitted, time: .shortened)) for the network login page",
+                  systemImage: "pause.circle")
+                .font(.caption).foregroundStyle(.orange)
+        } else if vpn.killSwitchHolding {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Can't reach the VPN server. If this Wi-Fi needs a login page (hotel, café), the kill switch is blocking it.")
+                    .font(.caption).fixedSize(horizontal: false, vertical: true)
+                Button("Open Login Page (pause kill switch for 2 min)") { vpn.pauseKillSwitch() }.controlSize(.small)
+            }
+        }
     }
 }

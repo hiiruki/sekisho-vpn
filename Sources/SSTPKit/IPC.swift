@@ -116,6 +116,7 @@ public struct Status: Codable, Equatable {
     public var untrustedCert: String? // SHA-256 of a server certificate macOS rejected, for the GUI to offer pinning
     public var latency: Double? // ms, round trip of the last SSTP echo to the server
     public var reachable: Bool? // health check result; nil = none configured or not checked yet
+    public var killSwitchPausedUntil: Double? // epoch seconds; kill switch off so a Wi-Fi login page can load
 
     public init() {}
 }
@@ -133,7 +134,7 @@ public struct Event: Codable {
 }
 
 public struct Request: Codable {
-    public enum Cmd: String, Codable { case connect, disconnect, status }
+    public enum Cmd: String, Codable { case connect, disconnect, status, pauseKillSwitch }
     public var cmd: Cmd
     public var profile: Profile?
 

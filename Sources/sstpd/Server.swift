@@ -20,6 +20,8 @@ final class Server {
     private var attempts = 0
     private var lastServerIP: String? // set once the session has been connected
     private let killSwitch = KillSwitch()
+    private var killSwitchPausedUntil: Date? // network login page (captive portal) in progress
+    private var pauseEnd: DispatchWorkItem?
     private let clientRequirement: SecRequirement?
 
     init(clientRequirement: String?) {
@@ -143,7 +145,29 @@ final class Server {
             attempts = 0
             lastServerIP = nil
             startTunnel()
+        case .pauseKillSwitch:
+            // a Wi-Fi login page (captive portal) cannot load behind the kill switch; offered only while reconnecting
+            guard let p = session, p.killSwitch, p.isFullTunnel, status.state != .connected, let ip = lastServerIP else { return }
+            killSwitch.disable()
+            killSwitchPausedUntil = Date().addingTimeInterval(120)
+            log("Kill switch paused for 2 minutes for a network login page")
+            let w = DispatchWorkItem { [weak self] in
+                guard let self, self.session != nil else { return }
+                self.clearPause()
+                self.killSwitch.update(server: ip, port: p.port, tunnel: nil)
+                self.publish(self.status)
+            }
+            pauseEnd?.cancel()
+            pauseEnd = w
+            q.asyncAfter(deadline: .now() + 120, execute: w)
+            publish(status)
         }
+    }
+
+    private func clearPause() {
+        pauseEnd?.cancel()
+        pauseEnd = nil
+        killSwitchPausedUntil = nil
     }
 
     // MARK: session
@@ -157,7 +181,10 @@ final class Server {
             if s.state == .connected, self.status.state != .connected, let ip = t?.serverIP {
                 self.attempts = 0
                 self.lastServerIP = ip
-                if guarded { self.killSwitch.update(server: ip, port: p.port, tunnel: s.interface) }
+                if guarded {
+                    self.clearPause() // back up: block again right away
+                    self.killSwitch.update(server: ip, port: p.port, tunnel: s.interface)
+                }
             }
             self.publish(s)
         }
@@ -169,7 +196,7 @@ final class Server {
             guard let message, retryable, let p = self.session, p.autoReconnect, let ip = self.lastServerIP else {
                 return self.endSession(message, untrustedCert: cert)
             }
-            if guarded { self.killSwitch.update(server: ip, port: p.port, tunnel: nil) } // keep blocking, minus the dead tunnel
+            if guarded, self.killSwitchPausedUntil == nil { self.killSwitch.update(server: ip, port: p.port, tunnel: nil) } // keep blocking, minus the dead tunnel
             self.attempts += 1
             let delay = min(60, 1 << min(self.attempts, 6)) // 2, 4, 8, … 60 s
             var s = Status()
@@ -194,6 +221,7 @@ final class Server {
         retry?.cancel()
         retry = nil
         killSwitch.disable()
+        clearPause()
         var s = Status()
         s.message = message ?? ""
         s.untrustedCert = untrustedCert
@@ -203,6 +231,8 @@ final class Server {
     // MARK: output
 
     private func publish(_ s: Status) {
+        var s = s
+        s.killSwitchPausedUntil = killSwitchPausedUntil?.timeIntervalSince1970
         status = s
         broadcast(Event(status: s))
     }
