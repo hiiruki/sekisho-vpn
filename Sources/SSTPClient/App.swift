@@ -167,6 +167,7 @@ final class VPNModel: ObservableObject {
     private var replaceLogs = true // the first event of each daemon connection carries its whole backlog
     private var seenStatus = false // no notifications for the state we find on (re)connecting to the daemon
     private var dropped = false // the last connection fell over on its own; the next "connected" is a reconnect
+    private var certWarned = false
     private var autoConnectPending: Bool
     private var sampleID = 0
     private let network = NetworkWatcher()
@@ -268,6 +269,12 @@ final class VPNModel: ObservableObject {
             if seenStatus { notifyTransition(from: status, to: s) }
             seenStatus = true
             status = s
+            if s.state == .connected, !certWarned, let w = certWarning { // once per session, not per reconnect
+                certWarned = true
+                notify(w, certAdvice, id: "cert")
+            } else if s.state == .disconnected {
+                certWarned = false
+            }
             if s.state == .connected {
                 sampleID += 1
                 history.append(Sample(id: sampleID, rx: s.rxRate, tx: s.txRate))
@@ -313,12 +320,27 @@ final class VPNModel: ObservableObject {
         }
     }
 
-    private func notify(_ title: String, _ body: String) {
+    /// One identifier per topic: a newer notification replaces the previous one in Notification Center.
+    private func notify(_ title: String, _ body: String, id: String = "vpn-state") {
         let c = UNMutableNotificationContent()
         c.title = title
         c.body = body
-        // one identifier: each state replaces the previous one in Notification Center instead of piling up
-        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "vpn-state", content: c, trigger: nil))
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id, content: c, trigger: nil))
+    }
+
+    /// The session's server certificate expires within 14 days (or has: then only a pin still accepts it).
+    var certWarning: String? {
+        guard status.state == .connected, let t = status.certExpires else { return nil }
+        let days = Int(((t - Date().timeIntervalSince1970) / 86400).rounded(.down))
+        guard days <= 14 else { return nil }
+        return days < 0 ? String(localized: "The server certificate has expired")
+            : String(localized: "The server certificate expires in \(days) days")
+    }
+
+    var certAdvice: String {
+        sessionProfile?.pinnedCert != nil
+            ? String(localized: "It is pinned: when the server renews it, Sekisho will refuse the new one. Ask your VPN administrator for its fingerprint.")
+            : String(localized: "Tell your VPN administrator before it stops working.")
     }
 
     // MARK: actions
@@ -646,6 +668,7 @@ struct ContentView: View {
             ProfileForm(p: vpn.currentBinding).disabled(vpn.busy)
 
             KillSwitchPauseBanner()
+            CertExpiryWarning()
 
             if let cert = vpn.status.untrustedCert, vpn.status.state == .disconnected {
                 CertificatePrompt(sha256: cert)
@@ -852,6 +875,7 @@ struct MenuPanel: View {
             }
 
             KillSwitchPauseBanner()
+            CertExpiryWarning()
 
             if connected {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
@@ -935,6 +959,20 @@ struct KillSwitchPauseBanner: View {
                     .font(.caption).fixedSize(horizontal: false, vertical: true)
                 Button("Open Login Page (pause kill switch for 2 min)") { vpn.pauseKillSwitch() }.controlSize(.small)
             }
+        }
+    }
+}
+
+struct CertExpiryWarning: View {
+    @EnvironmentObject var vpn: VPNModel
+
+    var body: some View {
+        if let warning = vpn.certWarning {
+            VStack(alignment: .leading, spacing: 2) {
+                Label(warning, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Text(vpn.certAdvice).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+            .font(.caption)
         }
     }
 }

@@ -117,6 +117,7 @@ public struct Status: Codable, Equatable {
     public var latency: Double? // ms, round trip of the last SSTP echo to the server
     public var reachable: Bool? // health check result; nil = none configured or not checked yet
     public var killSwitchPausedUntil: Double? // epoch seconds; kill switch off so a Wi-Fi login page can load
+    public var certExpires: Double? // epoch seconds: notAfter of the server certificate
 
     public init() {}
 }

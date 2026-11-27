@@ -114,6 +114,7 @@ public final class Tunnel {
             guard let leaf = (SecTrustCopyCertificateChain(t) as? [SecCertificate])?.first else { return complete(false) }
             let der = SecCertificateCopyData(leaf) as Data
             self.serverCert = Array(der) // the Crypto Binding needs the exact cert the server presented
+            self.status.certExpires = certNotAfter(leaf)
             SecTrustSetPolicies(t, SecPolicyCreateSSL(true, self.profile.server as CFString))
             if SecTrustEvaluateWithError(t, nil) { return complete(true) }
             let fingerprint = SHA256.hash(data: der).map { String(format: "%02x", $0) }.joined()
@@ -455,6 +456,15 @@ public final class Tunnel {
         if let message { log(message) }
         onEnded(message, retryable)
     }
+}
+
+/// Expiry (notAfter) of a certificate as epoch seconds.
+func certNotAfter(_ cert: SecCertificate) -> Double? {
+    let key = kSecOIDX509V1ValidityNotAfter as String
+    guard let values = SecCertificateCopyValues(cert, [key] as CFArray, nil) as? [String: Any],
+          let entry = values[key] as? [String: Any],
+          let t = (entry[kSecPropertyKeyValue as String] as? NSNumber)?.doubleValue else { return nil }
+    return t + kCFAbsoluteTimeIntervalSince1970
 }
 
 private func resolveIPv4Literal(_ s: String) -> String? {
