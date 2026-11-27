@@ -11,7 +11,7 @@ Command Line Tools and Swift Package Manager are enough.
 |---|---|
 | Bundle ID | `moe.hiiruki.sekisho` |
 | Helper | `moe.hiiruki.sekisho.helper` (launchd, root) |
-| Version | set in `scripts/build-app.sh` (`VERSION`, `BUILD`) |
+| Version | SemVer from the latest `vX.Y.Z` git tag; build number = commit count (`scripts/build-app.sh`) |
 | Icon | drawn by `scripts/make-art.swift` in the macOS 27 Liquid Glass look: a glass shield (VPN) holding a checkpoint gate with a keyhole |
 
 ## Features
@@ -55,14 +55,25 @@ scripts/build-app.sh          # just the app -> build/app.noindex/Sekisho.app ("
 swift run selftest            # RFC 2759/3079 vectors, SSTP framing, scripted PPP exchange, input validation
 sudo scripts/install-daemon.sh .build/release/sstpd   # install the helper by hand
 sudo scripts/uninstall-daemon.sh                      # remove the helper (then delete the app)
-scripts/release.sh            # DMG + appcast.xml as a GitHub release (bump VERSION/BUILD in build-app.sh first)
+scripts/release.sh            # DMG + appcast.xml as a GitHub release for the tag at HEAD (CI runs this)
 ```
 
-Releases are signed for Sparkle with an EdDSA key kept in the login keychain (public half: `SUPublicEDKey` in
-`build-app.sh`). Back it up with `.build/artifacts/sparkle/Sparkle/bin/generate_keys -x sekisho-sparkle.key`: without it,
-installed copies can no longer be updated.
-
 The helper log is `/var/log/sekisho.log` (rotated at 1 MB to `sekisho.log.1`). The window shows the same lines live.
+
+### Releasing
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, …) and
+versions follow [SemVer](https://semver.org/): `fix` → patch, `feat` → minor, breaking change → major.
+
+```sh
+git tag -s v1.1.0 -m "Sekisho 1.1.0" && git push origin v1.1.0
+```
+
+`.github/workflows/release.yml` then checks that the tag is signed by Hiiruki, runs the selftest, builds and signs
+the app, and publishes the DMG and `appcast.xml` as a GitHub Release, which installed copies pick up through Sparkle.
+It uses two repository secrets: `SEKISHO_SIGNING_P12` (the self-signed identity, so CI builds keep the same code
+signature as local ones) and `SPARKLE_ED_KEY` (the EdDSA private key; public half `SUPublicEDKey` in `build-app.sh`).
+Keep an offline backup of both: without the Sparkle key, installed copies can no longer be updated.
 
 ## Using profiles
 
