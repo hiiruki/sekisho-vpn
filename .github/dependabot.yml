@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Sparkle installs updates, so its fixes ship to users: "fix(deps): …" also lands in the release notes
+  - package-ecosystem: swift
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: fix
+      include: scope
+  # actions are pinned by commit SHA; Dependabot keeps the SHA and its version comment current
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
