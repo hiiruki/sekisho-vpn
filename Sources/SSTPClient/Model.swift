@@ -69,6 +69,7 @@ final class VPNModel: ObservableObject {
     private let network = NetworkWatcher()
     private var handledNetwork: String? // auto-connect acts once per network, so a manual disconnect sticks
     private var hotKey: HotKey?
+    private var offeredHelperUpdate = false // once per launch
 
     init() {
         // settings of builds from before the Sekisho rename live in the old bundle id's domain (left untouched)
@@ -163,6 +164,10 @@ final class VPNModel: ObservableObject {
             return
         }
         helperOutdated = e.v != protocolVersion
+        if helperOutdated, !offeredHelperUpdate {
+            offeredHelperUpdate = true
+            DispatchQueue.main.async { self.offerHelperUpdate() } // a modal alert, so not from inside event handling
+        }
         if let s = e.status {
             if seenStatus {
                 notifyTransition(from: status, to: s)
@@ -525,6 +530,16 @@ final class VPNModel: ObservableObject {
                 await MainActor.run { self.installError = text.trimmingCharacters(in: .whitespacesAndNewlines) }
             }
         }
+    }
+
+    /// After an app update with a new helper protocol the VPN cannot connect until the helper is updated too; ask
+    /// right away instead of leaving it to the banner in the window.
+    private func offerHelperUpdate() {
+        NSApp.activate(ignoringOtherApps: true)
+        let ok = alert(String(localized: "Update the helper?"),
+                       String(localized: "Sekisho was updated and its root helper (sstpd) is now older than the app, so the VPN cannot connect until it is updated too. This asks for an admin password and drops an active VPN."),
+                       confirm: String(localized: "Update Helper"))
+        if ok { installHelper() }
     }
 }
 

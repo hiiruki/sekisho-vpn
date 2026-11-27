@@ -112,3 +112,6 @@
 "macOS hides the Wi-Fi name, so this network is skipped. Allow Sekisho in System Settings → Privacy & Security → Location Services." = "macOS menyembunyikan nama Wi-Fi, jadi jaringan ini dilewati. Izinkan Sekisho di Pengaturan Sistem → Privasi & Keamanan → Layanan Lokasi.";
 "optional: intranet.example.com or host:8080" = "opsional: intranet.example.com atau host:8080";
 "vpn.example.com" = "vpn.example.com";
+"Update the helper?" = "Perbarui helper?";
+"Sekisho was updated and its root helper (sstpd) is now older than the app, so the VPN cannot connect until it is updated too. This asks for an admin password and drops an active VPN." = "Sekisho sudah diperbarui dan helper root-nya (sstpd) kini lebih lama dari app, jadi VPN tidak bisa tersambung sampai helper ikut diperbarui. Langkah ini meminta password admin dan memutus VPN yang aktif.";
+"Update Helper" = "Perbarui Helper";
