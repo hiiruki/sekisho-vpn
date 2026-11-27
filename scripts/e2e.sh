@@ -62,7 +62,7 @@ def check(ok, what):
 wait(lambda st: True, 10)  # first event: current status and log backlog
 send({"cmd": "connect", "profile": {
     "name": "e2e", "server": "127.0.0.1", "port": 443, "username": "test@DEFAULT", "password": "e2e-pass",
-    "pinnedCert": pin, "routes": "192.168.30.0/24, example.com", "autoReconnect": False}})
+    "pinnedCert": pin, "routes": "192.168.30.0/24, example.com", "healthCheck": "example.com:80", "autoReconnect": False}})
 st = wait(lambda st: st["state"] == "connected" or (st["state"] == "disconnected" and st.get("message")), 60)
 check(st["state"] == "connected", "connected: " + st.get("message", ""))
 ip, ifname = st["localIP"], st["interface"]
@@ -78,6 +78,8 @@ for _ in range(20):
 check(f"interface: {ifname}" in out("route", "-n", "get", "example.com"), f"example.com routed via {ifname}")
 code = out("curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "20", "http://example.com/")
 check(code == "200", f"HTTP through the tunnel ({code})")
+st = wait(lambda st: st.get("reachable") is not None, 40)
+check(st["reachable"], "health check example.com:80 reachable through the tunnel")
 
 send({"cmd": "disconnect"})
 wait(lambda st: st["state"] == "disconnected", 15)
