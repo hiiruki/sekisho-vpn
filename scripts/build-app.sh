@@ -4,10 +4,16 @@
 # ".noindex" keeps Spotlight/Launchpad from listing this copy next to the installed one in /Applications.
 set -e
 cd "$(dirname "$0")/.."
-# selftest needs a debug build (@testable), so build only the shipped products
-swift build -c release --product SSTPClient
-swift build -c release --product sstpd
-BIN=$(swift build -c release --show-bin-path)
+# selftest needs a debug build (@testable), so build only the shipped products. Universal: Apple silicon and Intel,
+# one build per architecture joined by lipo (a single multi-arch `swift build` needs Xcode). Each architecture is
+# copied out right away: some SwiftPM versions put both in the same output directory.
+rm -rf build/arch && mkdir -p build/arch
+for ARCH in arm64 x86_64; do
+  swift build -c release --arch $ARCH --product SSTPClient
+  swift build -c release --arch $ARCH --product sstpd
+  BIN=$(swift build -c release --arch $ARCH --show-bin-path)
+  mkdir -p build/arch/$ARCH && cp "$BIN/SSTPClient" "$BIN/sstpd" build/arch/$ARCH/
+done
 APP=build/app.noindex/Sekisho.app
 # Version from git, so a local build always says what it is: "1.3.0" exactly at the v1.3.0 tag, "1.3.0-2-gabc1234"
 # two commits later, "-dirty" with uncommitted changes. Only a clean tag build can be released (release.sh needs the
@@ -20,10 +26,11 @@ KC=$(scripts/make-signing-identity.sh)
 
 rm -rf build/app.noindex # also drops apps built under older names
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
-cp "$BIN/SSTPClient" "$APP/Contents/MacOS/"
-cp "$BIN/sstpd" scripts/install-daemon.sh scripts/uninstall-daemon.sh "$APP/Contents/Resources/"
+lipo -create build/arch/arm64/SSTPClient build/arch/x86_64/SSTPClient -output "$APP/Contents/MacOS/SSTPClient"
+lipo -create build/arch/arm64/sstpd build/arch/x86_64/sstpd -output "$APP/Contents/Resources/sstpd"
+cp scripts/install-daemon.sh scripts/uninstall-daemon.sh "$APP/Contents/Resources/"
 cp -R Localization/*.lproj "$APP/Contents/Resources/"
-ditto "$BIN/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+ditto "$BIN/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework" # already universal
 install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/SSTPClient"
 
 # icon: render 1024px master, downscale into an .iconset, pack with iconutil
