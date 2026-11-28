@@ -3,7 +3,7 @@
 **SSTP VPN client for macOS** · by [Hiiruki](https://hiiruki.moe)
 
 A *sekisho* was a checkpoint gate on the old Japanese highways: you passed only with the right papers. Sekisho is a
-native SSTP VPN client for macOS 13+: a SwiftUI window and menu bar app, plus a small root helper (`sstpd`) that
+native SSTP VPN client for macOS 13+ on Apple silicon and Intel: a SwiftUI window and menu bar app, plus a small root helper (`sstpd`) that
 creates the tunnel with a plain `utun` interface. No NetworkExtension, no paid developer account, no Xcode:
 Command Line Tools and Swift Package Manager are enough.
 
@@ -28,7 +28,8 @@ Command Line Tools and Swift Package Manager are enough.
 - **Diagnostics…**: one `.log` with the log, routes, DNS and interfaces for your VPN administrator (no passwords)
 - **Profile files**: export a profile as `.sekisho` (without the password) for colleagues; import or double-click to add
 - **Links** for Shortcuts, Raycast or Focus filters: `sekisho://connect?profile=Name`, `sekisho://disconnect`, `sekisho://toggle` (a link that disconnects asks first, unless you allow it once for all)
-- **Menu bar**: fixed-width ↑/↓ speed readout, connect/disconnect per profile, **switch profiles** while connected; **⌃⌥⌘V** toggles the VPN from any app
+- **Menu bar**: fixed-width ↑/↓ speed readout, its own icons for connecting and for a kill switch holding the internet, connect/disconnect per profile, **switch profiles** while connected; a **global shortcut** (⌃⌥⌘V, can be changed or turned off) toggles the VPN from any app
+- **Quitting disconnects**: Quit and ⌘Q take the VPN down first, so no tunnel is left running without the app
 - **Auto-connect** whenever the Mac is not on a trusted Wi-Fi, with a **profile per Wi-Fi** if you like (needs Location permission: macOS hides Wi-Fi names otherwise)
 - **Notifications** for connected, connection lost, reconnected, disconnected and failed connections, with **Connect Again** and **Open Login Page** buttons; **launch at login**; **connect when the app starts**
 - **Updates** through Sparkle from GitHub Releases (**Sekisho → Check for Updates…**); **Uninstall Helper…** in the same menu
@@ -85,7 +86,9 @@ Keep an offline backup of both: without the Sparkle key, installed copies can no
 
 Every push to `main` and every pull request also runs `.github/workflows/e2e.yml`: a real SSTP tunnel against a
 SoftEther VPN Server on the runner (pinned certificate, crypto binding, MS-CHAPv2, routes, hostname routing, cleanup,
-session history). What needs a real server, Wi-Fi or a person is in [docs/TESTING.md](docs/TESTING.md). Dependabot
+session history) and the selftest, on macOS 15, macOS 26 and macOS 15 on Intel, where the universal app is also built
+and started. GitHub no longer offers macOS 13 or 14 runners, so those are built for (minimum version 13.0) but not
+tested. What needs a real server, Wi-Fi or a person is in [docs/TESTING.md](docs/TESTING.md). Dependabot
 proposes Sparkle and GitHub Actions updates weekly. `main` and the `v*` tags are protected: signed commits only, no
 force-push, tags cannot be moved or deleted.
 
