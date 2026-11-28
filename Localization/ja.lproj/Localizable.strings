@@ -135,3 +135,5 @@
 "optional: Home, iPhone" = "任意: Home, iPhone";
 "optional: intranet.example.com or host:8080" = "任意: intranet.example.com または host:8080";
 "vpn.example.com" = "vpn.example.com";
+"VPN reconnecting; the kill switch blocks the internet" = "VPN 再接続中。キルスイッチがインターネットを遮断しています";
+"VPN connecting" = "VPN 接続中…";

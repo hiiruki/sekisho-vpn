@@ -38,6 +38,12 @@ struct SSTPClientApp: App {
             if vpn.status.state == .connected {
                 Image(nsImage: menuBarSpeedImage(rx: vpn.status.rxRate, tx: vpn.status.txRate))
                     .accessibilityLabel(Text("VPN connected, down \(speed(vpn.status.rxRate)), up \(speed(vpn.status.txRate))"))
+            } else if vpn.killSwitchHolding {
+                Image(systemName: "exclamationmark.shield.fill") // internet blocked until the VPN is back
+                    .accessibilityLabel(Text("VPN reconnecting; the kill switch blocks the internet"))
+            } else if vpn.busy {
+                Image(systemName: "shield.lefthalf.filled") // connecting, reconnecting or disconnecting
+                    .accessibilityLabel(Text("VPN connecting"))
             } else {
                 Image(systemName: "lock.shield").accessibilityLabel(Text("VPN disconnected"))
             }
