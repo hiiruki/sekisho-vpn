@@ -12,11 +12,16 @@ struct Sample: Identifiable {
     let rx: Double, tx: Double
 }
 
-/// Shows banners even while our window is frontmost.
+/// Shows banners even while our window is frontmost, and runs the buttons on them.
 final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationPresenter()
     func userNotificationCenter(_ c: UNUserNotificationCenter, willPresent n: UNNotification) async -> UNNotificationPresentationOptions {
         [.banner, .list]
+    }
+
+    func userNotificationCenter(_ c: UNUserNotificationCenter, didReceive r: UNNotificationResponse) async {
+        let action = r.actionIdentifier
+        await MainActor.run { VPNModel.shared.notificationAction(action) }
     }
 }
 
@@ -89,6 +94,14 @@ final class VPNModel: ObservableObject {
 
         UNUserNotificationCenter.current().delegate = NotificationPresenter.shared
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert]) { _, _ in }
+        UNUserNotificationCenter.current().setNotificationCategories([
+            UNNotificationCategory(identifier: "retry", actions: [
+                UNNotificationAction(identifier: "connect", title: String(localized: "Connect Again")),
+            ], intentIdentifiers: []),
+            UNNotificationCategory(identifier: "portal", actions: [
+                UNNotificationAction(identifier: "loginPage", title: String(localized: "Open Login Page")),
+            ], intentIdentifiers: []),
+        ])
 
         link.onEvent = { [weak self] e in
             Task { @MainActor in self?.apply(e) }
@@ -205,28 +218,39 @@ final class VPNModel: ObservableObject {
             dropped = false
         case .connecting where a.state == .connected:
             dropped = true
-            notify(String(localized: "Connection to \(server) lost"), b.message)
+            let guarded = profiles.first { $0.name == name }.map { $0.killSwitch && $0.isFullTunnel } == true
+            notify(String(localized: "Connection to \(server) lost"), b.message, category: guarded ? "portal" : nil)
         case .disconnected:
             dropped = false
             if b.untrustedCert != nil {
                 notify(String(localized: "Couldn't connect to \(server)"),
                        String(localized: "The server's certificate is not trusted. Open Sekisho to review it."))
             } else if b.message.isEmpty || a.state == .connected { // user-requested, or an established tunnel ended
-                notify(String(localized: "Disconnected from \(server)"), b.message)
+                notify(String(localized: "Disconnected from \(server)"), b.message, category: b.message.isEmpty ? nil : "retry")
             } else { // ended before ever connecting: resolve, TLS, auth, timeout…
-                notify(String(localized: "Couldn't connect to \(server)"), b.message)
+                notify(String(localized: "Couldn't connect to \(server)"), b.message, category: "retry")
             }
         default:
             break
         }
     }
 
-    /// One identifier per topic: a newer notification replaces the previous one in Notification Center.
-    private func notify(_ title: String, _ body: String, id: String = "vpn-state") {
+    /// One identifier per topic: a newer notification replaces the previous one in Notification Center. The category
+    /// adds a button: "retry" connects again, "portal" opens a Wi-Fi login page past the kill switch.
+    private func notify(_ title: String, _ body: String, id: String = "vpn-state", category: String? = nil) {
         let c = UNMutableNotificationContent()
         c.title = title
         c.body = body
+        if let category { c.categoryIdentifier = category }
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: id, content: c, trigger: nil))
+    }
+
+    func notificationAction(_ action: String) {
+        switch action {
+        case "connect": if !busy, canConnect { connect() }
+        case "loginPage": if killSwitchHolding { pauseKillSwitch() }
+        default: break // the notification itself was clicked
+        }
     }
 
     /// The session's server certificate expires within 14 days (or has: then only a pin still accepts it).

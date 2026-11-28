@@ -128,3 +128,5 @@
 "Off: the password is asked for on every connect and never stored." = "Mati: password ditanyakan setiap kali menyambung dan tidak pernah disimpan.";
 "Ask for a one-time code" = "Minta kode sekali pakai";
 "For servers that expect a code from an authenticator app right after the password. Automatic reconnects cannot reuse the code." = "Untuk server yang meminta kode dari app autentikator tepat setelah password. Sambung ulang otomatis tidak bisa memakai kode itu lagi.";
+"Connect Again" = "Sambungkan Lagi";
+"Open Login Page" = "Buka Halaman Login";
