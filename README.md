@@ -13,7 +13,8 @@ Command Line Tools and Swift Package Manager are enough.
 
 <p align="center">
   <img src="docs/images/window.png" width="440" alt="Sekisho window: a connected profile with live speeds, latency, a health check, the speed chart and the log">
-  &nbsp;&nbsp;
+</p>
+<p align="center">
   <img src="docs/images/menu-bar.png" width="300" alt="Sekisho menu bar panel: connection status, speeds, duration, latency, health check and Switch to">
 </p>
 <p align="center"><sub>Sample data: <code>vpn.hiiruki.moe</code> in split tunnel, with a health check on an internal host.</sub></p>
