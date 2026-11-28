@@ -130,3 +130,6 @@
 "For servers that expect a code from an authenticator app right after the password. Automatic reconnects cannot reuse the code." = "Untuk server yang meminta kode dari app autentikator tepat setelah password. Sambung ulang otomatis tidak bisa memakai kode itu lagi.";
 "Connect Again" = "Sambungkan Lagi";
 "Open Login Page" = "Buka Halaman Login";
+"Auto-connect on Wi-Fi" = "Sambung otomatis di Wi-Fi";
+"optional: Home, iPhone" = "opsional: Rumah, iPhone";
+"With Connect automatically on, joining one of these Wi-Fi networks (comma-separated) uses this profile; elsewhere the selected profile is used." = "Saat Sambungkan otomatis aktif, bergabung ke salah satu Wi-Fi ini (pisahkan dengan koma) memakai profil ini; di jaringan lain profil yang dipilih yang dipakai.";

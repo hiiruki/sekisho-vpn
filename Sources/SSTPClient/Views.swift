@@ -123,6 +123,8 @@ struct ProfileForm: View {
                 .disabled(!p.isFullTunnel)
                 .help("Full tunnel only. Stays on through reconnects until you disconnect.")
             Toggle("Reconnect automatically", isOn: $p.autoReconnect)
+            TextField("Auto-connect on Wi-Fi", text: $p.wifiNetworks, prompt: Text("optional: Home, iPhone"))
+                .help("With Connect automatically on, joining one of these Wi-Fi networks (comma-separated) uses this profile; elsewhere the selected profile is used.")
             TextField("Health check", text: $p.healthCheck, prompt: Text("optional: intranet.example.com or host:8080"))
                 .help("An internal host that must accept connections through the VPN. Checked every 30 s; after 90 s unreachable the VPN reconnects (with Reconnect automatically).")
             if let pin = p.pinnedCert {

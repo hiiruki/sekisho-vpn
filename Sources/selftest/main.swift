@@ -165,6 +165,11 @@ for bad in ["", "abc", String(repeating: "zz", count: 32)] {
 }
 profile.pinnedCert = nil
 
+// Wi-Fi names for per-network auto-connect keep their spaces; only commas separate them
+profile.wifiNetworks = " Home Wi-Fi , iPhone,, Kantor 5G "
+check(profile.wifiList == ["Home Wi-Fi", "iPhone", "Kantor 5G"])
+profile.wifiNetworks = ""
+
 // Server certificate expiry: notAfter Dec 27 22:48:23 2026 GMT
 let certDER = Data(base64Encoded: "MIIB/DCCAaICCQC4EwBrm+xH/TAKBggqhkjOPQQDAjAMMQowCAYDVQQDDAF0MB4XDTI2MTEyNzIyNDgyM1oXDTI2MTIyNzIyNDgyM1owDDEKMAgGA1UEAwwBdDCCAUswggEDBgcqhkjOPQIBMIH3AgEBMCwGByqGSM49AQECIQD/////AAAAAQAAAAAAAAAAAAAAAP///////////////zBbBCD/////AAAAAQAAAAAAAAAAAAAAAP///////////////AQgWsY12Ko6k+ez671VdpiGvGUdBrDMU7D2O848PifSYEsDFQDEnTYIhucEk2pmeOETnSa3gZ9+kARBBGsX0fLhLEJH+Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT+NC4v4af5uO5+tKfA+eFivOM1drMV7Oy7ZAaDe/UfUCIQD/////AAAAAP//////////vOb6racXnoTzucrC/GMlUQIBAQNCAARMuSmp6Ix0ddOM8NSHhxHP0No3Qj78D2HtpvBjj+8TAJ76X5yWCoLj9Yi9o246GgGs3KQ6j3RUDBhQCJ52ai9VMAoGCCqGSM49BAMCA0gAMEUCIDECZXNAKxM3tGUndlab8WBNjDb9N+z+0NahLWQUJ1trAiEA/ina27JS1oKWOY3P8r1aPD9jLfI96n+GvDckAU9y18M=")!
 let testCert = SecCertificateCreateWithData(nil, certDER as CFData)!

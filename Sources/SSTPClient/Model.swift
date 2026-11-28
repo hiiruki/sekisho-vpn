@@ -473,14 +473,16 @@ final class VPNModel: ObservableObject {
         autoConnectIfUntrusted()
     }
 
-    /// Connects once per newly joined network unless it is a trusted Wi-Fi. A Wi-Fi whose name macOS hides is skipped
-    /// (it may be a trusted one) and judged again when Location permission reveals the name.
+    /// Connects once per newly joined network unless it is a trusted Wi-Fi, with the profile that lists this Wi-Fi, else
+    /// the selected one. A Wi-Fi whose name macOS hides is skipped (it may be a trusted one) and judged again when
+    /// Location permission reveals the name.
     private func autoConnectIfUntrusted() {
-        guard autoConnectUntrusted, seenStatus, canConnect, let key = network.key, key != handledNetwork,
+        guard autoConnectUntrusted, seenStatus, helperReachable, !helperOutdated, let key = network.key, key != handledNetwork,
               !(network.onWiFi && network.ssid == nil) else { return }
         handledNetwork = key
         guard status.state == .disconnected, !trustedList.contains(network.ssid ?? "") else { return }
-        connect()
+        if let ssid = network.ssid, let p = profiles.first(where: { $0.wifiList.contains(ssid) }) { selectedID = p.id }
+        if canConnect { connect() }
     }
 
     func trustAndConnect(_ certificate: String) {

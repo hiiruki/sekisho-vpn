@@ -29,6 +29,8 @@ public struct Profile: Codable, Equatable, Identifiable {
     public var savePassword = true
     /// Ask for a one-time code on connect and send it right after the password (RADIUS servers with OTP)
     public var askCode = false
+    /// Wi-Fi names (comma-separated) on which auto-connect uses this profile instead of the selected one
+    public var wifiNetworks = ""
 
     public init() {}
 
@@ -51,6 +53,12 @@ public struct Profile: Codable, Equatable, Identifiable {
         healthCheck = try c.decodeIfPresent(String.self, forKey: .healthCheck) ?? d.healthCheck
         savePassword = try c.decodeIfPresent(Bool.self, forKey: .savePassword) ?? d.savePassword
         askCode = try c.decodeIfPresent(Bool.self, forKey: .askCode) ?? d.askCode
+        wifiNetworks = try c.decodeIfPresent(String.self, forKey: .wifiNetworks) ?? d.wifiNetworks
+    }
+
+    /// Wi-Fi names may contain spaces, so only commas separate them
+    public var wifiList: [String] {
+        wifiNetworks.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
     }
 
     public var routeList: [String] { tokens(routes) }
