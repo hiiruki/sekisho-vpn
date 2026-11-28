@@ -16,7 +16,8 @@
 "Clear History" = "履歴を消去";
 "Connect Again" = "再接続";
 "Connect automatically when not on a trusted Wi-Fi" = "信頼済み Wi-Fi 以外では自動的に接続";
-"Connect or disconnect (⌃⌥⌘V from any app)" = "接続または切断（どのアプリからでも ⌃⌥⌘V）";
+"Connect or disconnect (%@ from any app)" = "接続または切断（どのアプリからでも %@）";
+"Connect or disconnect" = "接続または切断";
 "Connect to “%@”" = "“%@” に接続";
 "Connect when the app starts" = "アプリ起動時に接続";
 "Connect" = "接続";
@@ -137,3 +138,8 @@
 "vpn.example.com" = "vpn.example.com";
 "VPN reconnecting; the kill switch blocks the internet" = "VPN 再接続中。キルスイッチがインターネットを遮断しています";
 "VPN connecting" = "VPN 接続中…";
+"Shortcut to connect or disconnect from any app" = "どのアプリからでも接続・切断するショートカット";
+"Type a shortcut…" = "ショートカットを入力…";
+"Off" = "オフ";
+"Turn Off" = "オフにする";
+"macOS refused that shortcut; pick another." = "macOS がこのショートカットを拒否しました。別のものを選んでください。";

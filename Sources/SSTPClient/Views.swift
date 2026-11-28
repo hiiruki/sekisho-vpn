@@ -75,6 +75,13 @@ struct ContentView: View {
             }
             .font(.callout)
 
+            HStack {
+                Text("Shortcut to connect or disconnect from any app")
+                Spacer()
+                ShortcutRecorder()
+            }
+            .font(.callout)
+
             VStack(alignment: .leading, spacing: 6) {
                 Toggle("Connect automatically when not on a trusted Wi-Fi", isOn: $vpn.autoConnectUntrusted)
                 if vpn.autoConnectUntrusted {
@@ -232,6 +239,49 @@ struct LogView: View {
                     .help("Save the log with routes, DNS and interface details for your VPN administrator")
             }
         }
+    }
+}
+
+/// Click, then press the new shortcut (with ⌘, ⌥ or ⌃); Esc cancels.
+struct ShortcutRecorder: View {
+    @EnvironmentObject var vpn: VPNModel
+    @StateObject private var recording = Recording() // @State is a macro whose plugin Command Line Tools lack
+
+    final class Recording: ObservableObject {
+        @Published var monitor: Any?
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button(recording.monitor != nil ? String(localized: "Type a shortcut…") : (vpn.shortcut?.label ?? String(localized: "Off"))) {
+                recording.monitor == nil ? record() : stop()
+            }
+            .monospacedDigit()
+            if vpn.shortcut != nil, recording.monitor == nil {
+                Button("Turn Off") { vpn.setShortcut(nil) }
+            }
+        }
+    }
+
+    private func record() {
+        vpn.setShortcutActive(false)
+        recording.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+            if e.keyCode == 53 { // Esc
+                stop()
+            } else if let s = Shortcut(e) {
+                vpn.setShortcut(s)
+                stop()
+            } else {
+                NSSound.beep() // needs ⌘, ⌥ or ⌃
+            }
+            return nil
+        }
+    }
+
+    private func stop() {
+        if let m = recording.monitor { NSEvent.removeMonitor(m) }
+        recording.monitor = nil
+        vpn.setShortcutActive(true)
     }
 }
 

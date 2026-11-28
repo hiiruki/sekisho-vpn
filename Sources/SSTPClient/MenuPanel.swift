@@ -22,7 +22,7 @@ struct MenuPanel: View {
                 Spacer()
                 Toggle("VPN", isOn: Binding(get: { vpn.busy }, set: { $0 ? vpn.connect() : vpn.disconnect() }))
                     .toggleStyle(.switch)
-                    .help("Connect or disconnect (⌃⌥⌘V from any app)")
+                    .help(vpn.shortcut.map { String(localized: "Connect or disconnect (\($0.label) from any app)") } ?? String(localized: "Connect or disconnect"))
                     .labelsHidden()
                     .disabled(vpn.busy ? vpn.status.state == .disconnecting : !vpn.canConnect)
             }

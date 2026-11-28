@@ -13,7 +13,8 @@
 "Clear History" = "Hapus Riwayat";
 "Connect" = "Sambungkan";
 "Connect automatically when not on a trusted Wi-Fi" = "Sambungkan otomatis saat tidak di Wi-Fi tepercaya";
-"Connect or disconnect (⌃⌥⌘V from any app)" = "Sambungkan atau putuskan (⌃⌥⌘V dari app mana pun)";
+"Connect or disconnect (%@ from any app)" = "Sambungkan atau putuskan (%@ dari app mana pun)";
+"Connect or disconnect" = "Sambungkan atau putuskan";
 "Connect when the app starts" = "Sambungkan saat app dibuka";
 "Connected" = "Tersambung";
 "Connected to %@" = "Tersambung ke %@";
@@ -137,3 +138,8 @@
 "Export CSV…" = "Ekspor CSV…";
 "VPN reconnecting; the kill switch blocks the internet" = "VPN menyambung ulang; kill switch memblokir internet";
 "VPN connecting" = "VPN menyambung";
+"Shortcut to connect or disconnect from any app" = "Shortcut untuk menyambung atau memutus dari app mana pun";
+"Type a shortcut…" = "Tekan shortcut…";
+"Off" = "Mati";
+"Turn Off" = "Matikan";
+"macOS refused that shortcut; pick another." = "macOS menolak shortcut itu; pilih yang lain.";

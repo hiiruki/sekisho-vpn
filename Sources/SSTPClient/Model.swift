@@ -62,6 +62,7 @@ final class VPNModel: ObservableObject {
     private let network = NetworkWatcher()
     private var handledNetwork: String? // auto-connect acts once per network, so a manual disconnect sticks
     private var hotKey: HotKey?
+    @Published private(set) var shortcut: Shortcut? = .standard // nil = off
     private var offeredHelperUpdate = false // once per launch
 
     init() {
@@ -115,6 +116,25 @@ final class VPNModel: ObservableObject {
         hotKey = HotKey { [weak self] in
             Task { @MainActor in self?.toggleVPN() }
         }
+        // stored as JSON; "null" = turned off, nothing stored = the default ⌃⌥⌘V
+        if let data = defaults.data(forKey: "shortcut") { shortcut = try? JSONDecoder().decode(Shortcut?.self, from: data) }
+        hotKey?.set(shortcut)
+    }
+
+    /// nil turns the global shortcut off.
+    func setShortcut(_ s: Shortcut?) {
+        guard hotKey?.set(s) == true else {
+            hotKey?.set(shortcut) // keep the old one
+            installError = String(localized: "macOS refused that shortcut; pick another.")
+            return
+        }
+        shortcut = s
+        defaults.set(try? JSONEncoder().encode(s), forKey: "shortcut")
+    }
+
+    /// Off while a new shortcut is being recorded, so pressing the current one records it instead of toggling the VPN.
+    func setShortcutActive(_ on: Bool) {
+        hotKey?.set(on ? shortcut : nil)
     }
 
     /// Profiles go to UserDefaults without passwords; changed passwords go to the Keychain, unless the profile asks for
