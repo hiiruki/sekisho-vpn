@@ -9,8 +9,10 @@ swift build -c release --product SSTPClient
 swift build -c release --product sstpd
 BIN=$(swift build -c release --show-bin-path)
 APP=build/app.noindex/Sekisho.app
-# SemVer from the latest vX.Y.Z tag; BUILD = commit count, so Sparkle sees every release as newer
-VERSION=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null | sed 's/^v//')
+# Version from git, so a local build always says what it is: "1.3.0" exactly at the v1.3.0 tag, "1.3.0-2-gabc1234"
+# two commits later, "-dirty" with uncommitted changes. Only a clean tag build can be released (release.sh needs the
+# tag v$VERSION). BUILD = commit count, so Sparkle sees every release as newer.
+VERSION=$(git describe --tags --match 'v[0-9]*' --dirty 2>/dev/null | sed 's/^v//')
 VERSION=${VERSION:-0.0.0}
 BUILD=$(git rev-list --count HEAD 2>/dev/null || echo 0)
 SIGN_ID="Sekisho Self-Signed"

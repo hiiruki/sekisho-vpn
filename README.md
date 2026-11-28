@@ -11,7 +11,7 @@ Command Line Tools and Swift Package Manager are enough.
 |---|---|
 | Bundle ID | `moe.hiiruki.sekisho` |
 | Helper | `moe.hiiruki.sekisho.helper` (launchd, root) |
-| Version | SemVer from the latest `vX.Y.Z` git tag; build number = commit count (`scripts/build-app.sh`) |
+| Version | From git (`scripts/build-app.sh`): `1.3.0` exactly at the `v1.3.0` tag, `1.3.0-2-gabc1234` for commits after it, `-dirty` with uncommitted changes; build number = commit count |
 | Icon | drawn by `scripts/make-art.swift` in the macOS 27 Liquid Glass look: a glass shield (VPN) holding a checkpoint gate with a keyhole |
 
 ## Features
