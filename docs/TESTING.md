@@ -30,3 +30,6 @@ real VPN server, Wi-Fi changes or a person at the Mac is below: about 15 minutes
 | 23 | Window → **Shortcut**: record a new one (e.g. ⌃⌥⌘K), use it in another app; then **Turn Off** | The new shortcut toggles the VPN and ⌃⌥⌘V no longer does; turned off, neither does |
 | 24 | Connect, watch the menu bar; then lose the network on a kill-switch profile | Half shield while connecting, speeds when connected, exclamation shield while the kill switch holds |
 | 25 | On an Intel Mac: install the DMG, install the helper, connect | Same as on Apple silicon (`lipo -archs` lists x86_64 arm64) |
+| 26 | Connected, then `killall -9 SSTPClient` (do not reopen) | After ~30 s the VPN is down: no `utunN` with an address, the helper log says *No Sekisho app connected for 30 s*. Reopening within 30 s keeps it up |
+| 27 | Connected, then log out (or fast-switch to another user) | The VPN is down for the next user; the helper log says *no longer at the console* |
+| 28 | Full tunnel, **Bypass the VPN**: a subnet and a hostname (e.g. `zoom.us`); connect | `route -n get <an address in the subnet>` and `route -n get zoom.us` show your Wi-Fi, `route -n get 1.1.1.1` shows `utunN`; a Discord or Zoom call over a bypassed range sounds normal. With the kill switch on, the profile shows an error instead |

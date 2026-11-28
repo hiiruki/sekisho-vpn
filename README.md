@@ -29,7 +29,8 @@ Command Line Tools and Swift Package Manager are enough.
 - **Profile files**: export a profile as `.sekisho` (without the password) for colleagues; import or double-click to add
 - **Links** for Shortcuts, Raycast or Focus filters: `sekisho://connect?profile=Name`, `sekisho://disconnect`, `sekisho://toggle` (a link that disconnects asks first, unless you allow it once for all)
 - **Menu bar**: fixed-width ↑/↓ speed readout, its own icons for connecting and for a kill switch holding the internet, connect/disconnect per profile, **switch profiles** while connected; a **global shortcut** (⌃⌥⌘V, can be changed or turned off) toggles the VPN from any app
-- **Quitting disconnects**: Quit and ⌘Q take the VPN down first, so no tunnel is left running without the app
+- **No tunnel left behind**: Quit and ⌘Q disconnect first; if the app crashes or is force-quit, the helper disconnects after 30 s without an app; logging out or switching to another user disconnects too
+- **Bypass the VPN** (full tunnel): subnets or hostnames that keep using the normal network, e.g. for voice and video calls that stutter over SSTP
 - **Auto-connect** whenever the Mac is not on a trusted Wi-Fi, with a **profile per Wi-Fi** if you like (needs Location permission: macOS hides Wi-Fi names otherwise)
 - **Notifications** for connected, connection lost, reconnected, disconnected and failed connections, with **Connect Again** and **Open Login Page** buttons; **launch at login**; **connect when the app starts**
 - **Updates** through Sparkle from GitHub Releases (**Sekisho → Check for Updates…**); **Uninstall Helper…** in the same menu
@@ -98,6 +99,7 @@ force-push, tags cannot be moved or deleted.
 |---|---|
 | Split tunnel | Empty: all traffic through the VPN. Otherwise subnets/IPs and hostnames, e.g. `192.168.212.0/24, intranet.collega.co.id`. Hostnames are resolved by the VPN's DNS (they are added to split DNS) and their addresses refreshed every 5 minutes |
 | DNS domains | Split tunnel only: domains resolved by the VPN's DNS, e.g. `collega.co.id`. Other names use your normal DNS |
+| Bypass the VPN | Full tunnel only. Subnets or hostnames that keep using the normal network, e.g. for Discord or Zoom calls (SSTP runs over TCP, which voice and video handle badly). Hostnames are resolved and routed by address; services whose addresses change often need their subnets. Not together with the kill switch, which would block that traffic |
 | Kill switch | Full tunnel only. On a drop, traffic stays blocked (except the local network and the VPN server) until the VPN is back or you disconnect |
 | Reconnect automatically | Reconnects a session that was up and dropped. Wrong password or an untrusted certificate never retries |
 | Pinned certificate | Set by **Trust This Certificate and Connect**. Compare the fingerprint with your administrator first |
