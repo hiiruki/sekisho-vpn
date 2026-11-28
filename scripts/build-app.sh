@@ -47,7 +47,7 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$BUILD</string>
   <key>CFBundleDevelopmentRegion</key><string>en</string>
-  <key>CFBundleLocalizations</key><array><string>en</string><string>id</string></array>
+  <key>CFBundleLocalizations</key><array><string>en</string><string>id</string><string>ja</string></array>
   <key>NSHumanReadableCopyright</key><string>© 2026 Hiiruki · hiiruki.moe</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
