@@ -26,3 +26,7 @@ real VPN server, Wi-Fi changes or a person at the Mac is below: about 15 minutes
 | 19 | Stop the server or block it while connected (or enter a wrong password and connect) | Notification with **Connect Again**; on a kill-switch profile, *Connection lost* with **Open Login Page** |
 | 20 | **Session History → Export CSV…** | One line per session, oldest first; opens in Numbers or Excel |
 | 21 | `DYLD_INSERT_LIBRARIES=<any dylib> /Applications/Sekisho.app/Contents/MacOS/SSTPClient` | The library is not loaded (hardened runtime) |
+| 22 | Connected (full tunnel), then **Quit** from the menu bar, and again with ⌘Q | The VPN disconnects before the app exits: no `utunN` with an address in `ifconfig`, `netstat -rn` has no `0/1` route |
+| 23 | Window → **Shortcut**: record a new one (e.g. ⌃⌥⌘K), use it in another app; then **Turn Off** | The new shortcut toggles the VPN and ⌃⌥⌘V no longer does; turned off, neither does |
+| 24 | Connect, watch the menu bar; then lose the network on a kill-switch profile | Half shield while connecting, speeds when connected, exclamation shield while the kill switch holds |
+| 25 | On an Intel Mac: install the DMG, install the helper, connect | Same as on Apple silicon (`lipo -archs` lists x86_64 arm64) |
