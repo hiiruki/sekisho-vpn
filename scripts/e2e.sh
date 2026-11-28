@@ -71,7 +71,7 @@ check(f"interface: {ifname}" in out("route", "-n", "get", "192.168.30.1"), f"sub
 check(subprocess.run(["ping", "-c", "3", "-t", "10", "192.168.30.1"]).returncode == 0, "ping through the tunnel")
 
 # hostname: resolved by the VPN's DNS (SecureNAT) and routed by address
-for _ in range(20):
+for _ in range(75):  # a first lookup can time out (30 s) and is retried every 10 s
     if f"interface: {ifname}" in out("route", "-n", "get", "example.com"):
         break
     time.sleep(1)

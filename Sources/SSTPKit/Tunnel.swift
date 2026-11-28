@@ -44,6 +44,8 @@ public final class Tunnel {
     private var echoSent: Date? // pending SSTP echo, for the latency readout
     private var ticks = 0
     private var routedHosts: Set<String> = [] // addresses of split-tunnel hostnames already routed
+    private var unresolvedHosts: Set<String> = [] // retried every tick: the VPN's DNS can be slow right after connecting
+    private var resolving = false
     private var healthFailures = 0
 
     private static let serviceKey = "State:/Network/Service/Sekisho"
@@ -223,7 +225,8 @@ public final class Tunnel {
         guard httpDone else { return }
         sendEcho()
         ticks += 1
-        if ticks % 30 == 0 { routeHosts() } // every 5 min: follow DNS changes of split-tunnel hostnames
+        // every 5 min: follow DNS changes of split-tunnel hostnames; every tick while one could not be resolved yet
+        if ticks % 30 == 0 || !unresolvedHosts.isEmpty { routeHosts() }
         if ticks % 3 == 0 { checkHealth() }
         if Date().timeIntervalSince(lastRx) > 45 { finish("Server stopped responding") }
     }
@@ -352,13 +355,19 @@ public final class Tunnel {
     /// Addresses that disappear keep their route until disconnect.
     private func routeHosts() {
         let hosts = profile.routeHosts, server = serverIP
-        guard !hosts.isEmpty, let name = status.interface else { return }
+        guard !hosts.isEmpty, !resolving, let name = status.interface else { return }
+        resolving = true // a lookup can take 30 s to time out, longer than a tick
         DispatchQueue.global().async { [weak self] in
             let resolved = hosts.map { ($0, resolveAllIPv4($0)) }
             self?.q.async {
                 guard let self, !self.ended else { return }
+                self.resolving = false
                 for (host, ips) in resolved {
-                    if ips.isEmpty { log("Cannot resolve \(host)") }
+                    if ips.isEmpty {
+                        if self.unresolvedHosts.insert(host).inserted { log("Cannot resolve \(host); retrying every 10 s") }
+                        continue
+                    }
+                    self.unresolvedHosts.remove(host)
                     // never the VPN server itself: its route must stay outside the tunnel
                     let new = ips.filter { $0 != server && !self.routedHosts.contains($0) }
                     guard !new.isEmpty else { continue }
