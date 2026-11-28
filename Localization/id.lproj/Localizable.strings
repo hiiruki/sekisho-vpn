@@ -121,3 +121,10 @@
 "Disconnect the VPN?" = "Putuskan VPN?";
 "A link (from a browser, Shortcuts or another app) asks Sekisho to disconnect." = "Sebuah link (dari browser, Shortcuts, atau app lain) meminta Sekisho memutus VPN.";
 "Don't ask again for links" = "Jangan tanya lagi untuk link";
+"One-time code" = "Kode sekali pakai";
+"Connect to “%@”" = "Sambungkan ke “%@”";
+"The code is sent right after the password, so an automatic reconnect cannot reuse it." = "Kode dikirim tepat setelah password, jadi sambung ulang otomatis tidak bisa memakainya lagi.";
+"Remember password" = "Ingat password";
+"Off: the password is asked for on every connect and never stored." = "Mati: password ditanyakan setiap kali menyambung dan tidak pernah disimpan.";
+"Ask for a one-time code" = "Minta kode sekali pakai";
+"For servers that expect a code from an authenticator app right after the password. Automatic reconnects cannot reuse the code." = "Untuk server yang meminta kode dari app autentikator tepat setelah password. Sambung ulang otomatis tidak bisa memakai kode itu lagi.";

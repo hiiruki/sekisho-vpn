@@ -107,7 +107,14 @@ struct ProfileForm: View {
             TextField("Server", text: $p.server, prompt: Text("vpn.example.com"))
             TextField("Port", value: $p.port, format: .number.grouping(.never))
             TextField("Username", text: $p.username)
-            SecureField("Password", text: $p.password)
+            if p.savePassword { SecureField("Password", text: $p.password) }
+            Toggle("Remember password", isOn: Binding(get: { p.savePassword }, set: {
+                p.savePassword = $0
+                if !$0 { p.password = "" } // and the Keychain item goes too (VPNModel.saveProfiles)
+            }))
+            .help("Off: the password is asked for on every connect and never stored.")
+            Toggle("Ask for a one-time code", isOn: $p.askCode)
+                .help("For servers that expect a code from an authenticator app right after the password. Automatic reconnects cannot reuse the code.")
             TextField("Split tunnel", text: $p.routes, prompt: Text("empty = all traffic; or 192.168.212.0/24, intranet.example.com"))
                 .help("Subnets or hostnames to send through the VPN. Hostnames are resolved by the VPN's DNS and refreshed every 5 minutes.")
             TextField("DNS domains", text: $p.dnsDomains, prompt: Text(p.isFullTunnel ? "all DNS uses the VPN" : "e.g. collega.co.id"))

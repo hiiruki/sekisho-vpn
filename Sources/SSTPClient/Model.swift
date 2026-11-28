@@ -104,10 +104,16 @@ final class VPNModel: ObservableObject {
         }
     }
 
-    /// Profiles go to UserDefaults without passwords; changed passwords go to the Keychain.
+    /// Profiles go to UserDefaults without passwords; changed passwords go to the Keychain, unless the profile asks for
+    /// its password on every connect: then none is kept.
     private func saveProfiles(old: [Profile]) {
-        for p in profiles where old.first(where: { $0.id == p.id })?.password != p.password {
-            Keychain.set(p.id.uuidString, p.password)
+        for p in profiles {
+            let before = old.first { $0.id == p.id }
+            if !p.savePassword {
+                if before?.savePassword != false { Keychain.delete(p.id.uuidString) }
+            } else if before?.password != p.password || before?.savePassword == false {
+                Keychain.set(p.id.uuidString, p.password)
+            }
         }
         let stripped = profiles.map { p -> Profile in
             var p = p
@@ -256,7 +262,35 @@ final class VPNModel: ObservableObject {
     func connect() {
         var p = current
         p.server = p.server.trimmingCharacters(in: .whitespaces)
+        if !p.savePassword || p.askCode {
+            guard let entered = askCredentials(p) else { return }
+            if !p.savePassword { p.password = entered.password }
+            p.password += entered.code // RADIUS OTP: the code follows the password
+        }
         link.send(Request(.connect, profile: p))
+    }
+
+    /// The password (when not remembered) and the one-time code, asked right before connecting; nil when cancelled.
+    private func askCredentials(_ p: Profile) -> (password: String, code: String)? {
+        let pass = NSSecureTextField(), code = NSTextField()
+        pass.placeholderString = String(localized: "Password")
+        code.placeholderString = String(localized: "One-time code")
+        let fields: [NSTextField] = (p.savePassword ? [] : [pass]) + (p.askCode ? [code] : [])
+        let stack = NSStackView(views: fields)
+        stack.orientation = .vertical
+        stack.spacing = 8
+        stack.frame = NSRect(x: 0, y: 0, width: 260, height: CGFloat(fields.count) * 22 + CGFloat(fields.count - 1) * 8)
+        for f in fields { f.widthAnchor.constraint(equalToConstant: 260).isActive = true }
+        let a = NSAlert()
+        a.messageText = String(localized: "Connect to “\(p.name)”")
+        a.informativeText = p.askCode ? String(localized: "The code is sent right after the password, so an automatic reconnect cannot reuse it.") : ""
+        a.accessoryView = stack
+        a.addButton(withTitle: String(localized: "Connect"))
+        a.addButton(withTitle: String(localized: "Cancel"))
+        a.window.initialFirstResponder = fields.first
+        NSApp.activate(ignoringOtherApps: true)
+        guard a.runModal() == .alertFirstButtonReturn else { return nil }
+        return (pass.stringValue, code.stringValue.trimmingCharacters(in: .whitespaces))
     }
 
     func connect(_ id: UUID) {

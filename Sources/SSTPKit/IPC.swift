@@ -25,6 +25,10 @@ public struct Profile: Codable, Equatable, Identifiable {
     public var autoReconnect = true
     /// Internal "host" or "host:port" (default 443) that must accept TCP connections through the tunnel. Empty = no check.
     public var healthCheck = ""
+    /// false: the password is not kept in the Keychain but asked for on every connect (shared Macs, office policy)
+    public var savePassword = true
+    /// Ask for a one-time code on connect and send it right after the password (RADIUS servers with OTP)
+    public var askCode = false
 
     public init() {}
 
@@ -45,6 +49,8 @@ public struct Profile: Codable, Equatable, Identifiable {
         killSwitch = try c.decodeIfPresent(Bool.self, forKey: .killSwitch) ?? d.killSwitch
         autoReconnect = try c.decodeIfPresent(Bool.self, forKey: .autoReconnect) ?? d.autoReconnect
         healthCheck = try c.decodeIfPresent(String.self, forKey: .healthCheck) ?? d.healthCheck
+        savePassword = try c.decodeIfPresent(Bool.self, forKey: .savePassword) ?? d.savePassword
+        askCode = try c.decodeIfPresent(Bool.self, forKey: .askCode) ?? d.askCode
     }
 
     public var routeList: [String] { tokens(routes) }
