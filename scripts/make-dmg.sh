@@ -51,7 +51,9 @@ end tell
 EOF
 
 sync
-hdiutil detach "$DEV" -quiet
+# Finder can hold the volume for a moment after the layout script (EBUSY, exit 16); retry, then force
+for _ in 1 2 3 4 5; do hdiutil detach "$DEV" -quiet && break; sleep 2; done
+[ ! -e "$DEV" ] || hdiutil detach "$DEV" -force -quiet
 hdiutil convert "$RW" -quiet -format UDZO -imagekey zlib-level=9 -o "$DMG"
 rm -rf "$RW" "$STAGE"
 echo "Built $DMG"
