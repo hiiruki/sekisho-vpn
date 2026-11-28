@@ -11,6 +11,8 @@ permissions:
 jobs:
   release:
     runs-on: macos-15
+    # the signing identity and the Sparkle key are secrets of this environment, which only v* tags may use
+    environment: release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
