@@ -79,7 +79,7 @@ git tag -s v1.1.0 -m "Sekisho 1.1.0" && git push origin v1.1.0
 the app, and publishes the DMG and `appcast.xml` as a GitHub Release, which installed copies pick up through Sparkle.
 The release notes come from the `feat`, `fix` and breaking commits since the previous tag (`scripts/release-notes.sh`):
 on the GitHub release, with the DMG's SHA-256, and in Sparkle's update dialog.
-It uses two repository secrets: `SEKISHO_SIGNING_P12` (the self-signed identity, so CI builds keep the same code
+It uses two secrets of the `release` environment, which only jobs for `v*` tags can read: `SEKISHO_SIGNING_P12` (the self-signed identity, so CI builds keep the same code
 signature as local ones) and `SPARKLE_ED_KEY` (the EdDSA private key; public half `SUPublicEDKey` in `build-app.sh`).
 Keep an offline backup of both: without the Sparkle key, installed copies can no longer be updated.
 
@@ -202,8 +202,12 @@ reconnecting, the last server address is reused if DNS is unreachable, for examp
 
 - **Socket:** mode `0660`, group `admin`. The daemon also checks the peer: only root or the user logged in at the
   console, and that user's process must satisfy the app's code signature requirement, pinned in the launchd plist
-  (`--client-requirement`) when the helper is installed from the app. A process of the same user that can run
-  `codesign` with the local signing key can still pass; a Developer ID (key off the Mac) would close that.
+  (`--client-requirement`) when the helper is installed from the app, and run with the hardened runtime. The runtime
+  blocks `DYLD_INSERT_LIBRARIES`, which would otherwise run any code inside the genuine app (library validation is
+  off only because Sparkle.framework has no Team ID). A process of the same user that can run `codesign` with the
+  local signing key can still pass; a Developer ID (key off the Mac) would close that.
+- **Updates:** Sparkle accepts only an appcast signed with the EdDSA key (`SURequireSignedFeed`) and checks each
+  update's signature before unpacking it, so neither the feed (versions, URLs, release notes) nor the DMG can be swapped.
 - **Input validation:** profiles are validated inside the root daemon. Subnets must be strict dotted quads with a
   prefix of 1–32, and split-tunnel hostnames, DNS domains and the health check host must be plain hostnames (no
   all-numeric names), because they end up in `route` arguments and `scutil` input.
