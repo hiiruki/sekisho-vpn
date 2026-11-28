@@ -118,3 +118,6 @@
 "Share profiles" = "Bagikan profil";
 "VPN connected, down %@, up %@" = "VPN tersambung, unduh %@, unggah %@";
 "VPN disconnected" = "VPN tidak tersambung";
+"Disconnect the VPN?" = "Putuskan VPN?";
+"A link (from a browser, Shortcuts or another app) asks Sekisho to disconnect." = "Sebuah link (dari browser, Shortcuts, atau app lain) meminta Sekisho memutus VPN.";
+"Don't ask again for links" = "Jangan tanya lagi untuk link";

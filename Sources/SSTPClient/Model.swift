@@ -299,12 +299,29 @@ final class VPNModel: ObservableObject {
             }
             if !busy, canConnect { connect() }
         case "disconnect":
-            if busy { disconnect() }
+            if busy, linkMayDisconnect() { disconnect() }
         case "toggle":
-            toggleVPN()
+            if !busy || linkMayDisconnect() { toggleVPN() }
         default:
             notify(String(localized: "Unknown link"), url.absoluteString)
         }
+    }
+
+    /// Any web page can open a sekisho:// link (the browser asks once), and a disconnect also drops the kill switch's
+    /// protection; ask first, unless the user chose not to be asked (for Shortcuts and Focus automations).
+    private func linkMayDisconnect() -> Bool {
+        if defaults.bool(forKey: "linksMayDisconnect") { return true }
+        let a = NSAlert()
+        a.messageText = String(localized: "Disconnect the VPN?")
+        a.informativeText = String(localized: "A link (from a browser, Shortcuts or another app) asks Sekisho to disconnect.")
+        a.addButton(withTitle: String(localized: "Disconnect"))
+        a.addButton(withTitle: String(localized: "Cancel"))
+        a.showsSuppressionButton = true
+        a.suppressionButton?.title = String(localized: "Don't ask again for links")
+        NSApp.activate(ignoringOtherApps: true)
+        guard a.runModal() == .alertFirstButtonReturn else { return false }
+        if a.suppressionButton?.state == .on { defaults.set(true, forKey: "linksMayDisconnect") }
+        return true
     }
 
     // MARK: profile files
