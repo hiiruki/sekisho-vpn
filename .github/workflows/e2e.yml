@@ -20,9 +20,12 @@ jobs:
       - name: Build SoftEther VPN Server
         run: |
           brew install cmake openssl@3 libsodium readline
-          git clone --depth 1 --branch 5.2.5192 --recurse-submodules --shallow-submodules \
-            https://github.com/SoftEtherVPN/SoftEtherVPN.git "$RUNNER_TEMP/se"
-          cd "$RUNNER_TEMP/se"
+          # 5.2.5192, by commit: a tag in someone else's repository can be moved
+          git init -q "$RUNNER_TEMP/se" && cd "$RUNNER_TEMP/se"
+          git remote add origin https://github.com/SoftEtherVPN/SoftEtherVPN.git # submodule URLs may be relative to it
+          git fetch -q --depth 1 origin 143abb3900c46136be0bb815269370cdda2ae286
+          git checkout -q FETCH_HEAD
+          git submodule update -q --init --depth 1 # submodules are pinned by the commit itself
           CMAKE_FLAGS="-DOPENSSL_ROOT_DIR=$(brew --prefix openssl@3)" ./configure
           make -C build -j"$(sysctl -n hw.ncpu)"
 
