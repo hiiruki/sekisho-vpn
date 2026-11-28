@@ -130,8 +130,15 @@ final class Server {
         // audit token, not pid: a pid can be reused by another process between connect and this check
         let attrs = [kSecGuestAttributeAudit: Data(bytes: &token, count: Int(len))] as CFDictionary
         var code: SecCode?
-        guard SecCodeCopyGuestWithAttributes(nil, attrs, [], &code) == errSecSuccess, let code else { return false }
-        return SecCodeCheckValidity(code, [], req) == errSecSuccess
+        guard SecCodeCopyGuestWithAttributes(nil, attrs, [], &code) == errSecSuccess, let code,
+              SecCodeCheckValidity(code, [], req) == errSecSuccess else { return false }
+        // and the hardened runtime: without it, DYLD_INSERT_LIBRARIES could run any code inside the genuine app
+        var stat: SecStaticCode?
+        var info: CFDictionary?
+        guard SecCodeCopyStaticCode(code, [], &stat) == errSecSuccess, let stat,
+              SecCodeCopySigningInformation(stat, [], &info) == errSecSuccess,
+              let flags = (info as? [String: Any])?[kSecCodeInfoFlags as String] as? UInt32 else { return false }
+        return flags & SecCodeSignatureFlags.runtime.rawValue != 0
     }
 
     private func handle(_ line: Data, from c: Int32) {

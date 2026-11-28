@@ -76,11 +76,12 @@ cat > "$APP/Contents/Info.plist" <<EOF
 </dict></plist>
 EOF
 
-# no hardened runtime: its library validation rejects frameworks without a Team ID, which self-signed code lacks
+# Sparkle's own helpers keep the plain signature; the app and the root helper get the hardened runtime, which blocks
+# DYLD_* injection: the helper trusts the app by its signature, so code injected into it must not be possible
 SPARKLE="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
 for c in "$SPARKLE"/XPCServices/*.xpc "$SPARKLE/Autoupdate" "$SPARKLE/Updater.app" "$APP/Contents/Frameworks/Sparkle.framework"; do
   codesign --force --keychain "$KC" -s "$SIGN_ID" "$c"
 done
-codesign --force --keychain "$KC" -s "$SIGN_ID" -i moe.hiiruki.sekisho.helper "$APP/Contents/Resources/sstpd"
-codesign --force --keychain "$KC" -s "$SIGN_ID" "$APP"
+codesign --force --keychain "$KC" -s "$SIGN_ID" -o runtime -i moe.hiiruki.sekisho.helper "$APP/Contents/Resources/sstpd"
+codesign --force --keychain "$KC" -s "$SIGN_ID" -o runtime --entitlements scripts/Sekisho.entitlements "$APP"
 echo "Built $APP  (open it, then click 'Install Helper…' once)"

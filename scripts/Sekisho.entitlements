@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Hardened runtime exceptions for Sekisho.app (scripts/build-app.sh). -->
+<plist version="1.0"><dict>
+  <!-- Sparkle.framework is signed with the same self-signed identity, which has no Team ID; library validation would
+       refuse it. DYLD_* injection stays blocked: that is a separate runtime protection. -->
+  <key>com.apple.security.cs.disable-library-validation</key><true/>
+  <!-- Wi-Fi name for auto-connect outside trusted networks -->
+  <key>com.apple.security.personal-information.location</key><true/>
+</dict></plist>
