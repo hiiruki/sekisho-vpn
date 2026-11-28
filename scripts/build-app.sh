@@ -55,6 +55,8 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>NSHighResolutionCapable</key><true/>
   <key>SUFeedURL</key><string>https://github.com/hiiruki/sekisho-vpn/releases/latest/download/appcast.xml</string>
   <key>SUPublicEDKey</key><string>ihtVbJ2XI0OMficqNIOKwJZu2gksfGDBJLqu2LDZjQM=</string>
+  <key>SURequireSignedFeed</key><true/>
+  <key>SUVerifyUpdateBeforeExtraction</key><true/>
   <key>NSLocationUsageDescription</key><string>Sekisho reads the Wi-Fi name to connect automatically outside your trusted networks.</string>
   <key>NSLocationWhenInUseUsageDescription</key><string>Sekisho reads the Wi-Fi name to connect automatically outside your trusted networks.</string>
   <key>CFBundleURLTypes</key><array><dict>
