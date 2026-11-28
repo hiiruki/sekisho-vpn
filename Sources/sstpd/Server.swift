@@ -25,6 +25,8 @@ final class Server {
     private let clientRequirement: SecRequirement?
     private var orphanStop: DispatchWorkItem? // pending end of a session no app is connected to
     private static let orphanGrace: TimeInterval = 30
+    private var sessionOwner: uid_t? // uid of the client that connected the session
+    private var consoleStore: SCDynamicStore? // keeps the console-user notification alive
     private var history: [Session] = [] // newest first, at most 200
     private var connectedStatus: Status? // latest status of the tunnel while it is up, for its history entry
     private static let historyFile = "/var/db/sekisho.sessions.json"
@@ -42,6 +44,7 @@ final class Server {
         logSink = { [weak self] line in self?.q.async { self?.appendLog(line) } }
         recoverAfterCrash()
         history = (try? JSONDecoder().decode([Session].self, from: Data(contentsOf: URL(fileURLWithPath: Self.historyFile)))) ?? []
+        watchConsoleUser()
 
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         unlink(daemonSocketPath)
@@ -157,6 +160,8 @@ final class Server {
             guard session == nil, tunnel == nil, let p = req.profile else { return }
             if let problem = p.problem { return endSession(problem) }
             session = p
+            var uid: uid_t = 0, gid: gid_t = 0
+            sessionOwner = getpeereid(c, &uid, &gid) == 0 ? uid : nil
             attempts = 0
             lastServerIP = nil
             startTunnel()
@@ -255,6 +260,25 @@ final class Server {
         }
         orphanStop = w
         q.asyncAfter(deadline: .now() + Self.orphanGrace, execute: w)
+    }
+
+    /// Logout, or fast user switching to someone else: the session belongs to the user who started it, so it ends
+    /// instead of carrying the next user's traffic (or that user being unable to stop it). Root's sessions (tests) stay.
+    private func watchConsoleUser() {
+        var ctx = SCDynamicStoreContext(version: 0, info: Unmanaged.passUnretained(self).toOpaque(),
+                                        retain: nil, release: nil, copyDescription: nil)
+        guard let store = SCDynamicStoreCreate(nil, "sstpd" as CFString, { _, _, info in
+            guard let info else { return }
+            Unmanaged<Server>.fromOpaque(info).takeUnretainedValue().consoleUserChanged() // Server lives as long as sstpd
+        }, &ctx) else { return log("Cannot watch the console user") }
+        SCDynamicStoreSetNotificationKeys(store, [SCDynamicStoreKeyCreateConsoleUser(nil)] as CFArray, nil)
+        SCDynamicStoreSetDispatchQueue(store, q)
+        consoleStore = store
+    }
+
+    private func consoleUserChanged() {
+        guard let owner = sessionOwner, owner != 0, consoleUID() != owner else { return }
+        stopSession("The user who connected is no longer at the console (logout or user switch); disconnecting")
     }
 
     private func endSession(_ message: String?, untrustedCert: String? = nil) {
