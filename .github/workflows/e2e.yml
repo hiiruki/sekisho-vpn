@@ -1,6 +1,7 @@
 name: E2E
 
-# A real SSTP tunnel against a local SoftEther VPN Server: scripts/e2e.sh
+# A real SSTP tunnel against a local SoftEther VPN Server (scripts/e2e.sh), plus the selftest, on the oldest and newest
+# macOS the runners offer and on Intel (the x86_64 half of the universal build)
 on:
   push:
     branches: [main]
@@ -12,10 +13,18 @@ permissions:
 
 jobs:
   tunnel:
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Selftest
+        # `swift run` is SIGKILLed on the runners; the binary itself is fine
+        run: swift build --product selftest && "$(swift build --show-bin-path)/selftest"
 
       - name: Build SoftEther VPN Server
         run: |
@@ -31,6 +40,18 @@ jobs:
 
       - name: Tunnel test
         run: scripts/e2e.sh "$RUNNER_TEMP/se/build"
+
+      - name: Universal app starts on Intel
+        if: matrix.os == 'macos-15-intel'
+        run: |
+          scripts/build-app.sh # arm64 is cross-compiled here, x86_64 native: the slice Intel Macs run
+          A=build/app.noindex/Sekisho.app
+          lipo -archs "$A/Contents/MacOS/SSTPClient" | grep -q x86_64
+          "$A/Contents/Resources/sstpd" 2>&1 | grep -q "must run as root" # loads and runs its first line
+          "$A/Contents/MacOS/SSTPClient" & p=$!
+          sleep 10
+          kill -0 $p # still running: frameworks loaded, UI up
+          kill $p
 
       - name: Helper log
         if: failure()
