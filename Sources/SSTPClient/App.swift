@@ -61,10 +61,14 @@ func showAbout() {
     NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
 }
 
-/// Receives sekisho:// links (Launch Services delivers them as "open URLs").
+/// Receives sekisho:// links (Launch Services delivers them as "open URLs") and holds quitting until the VPN is down.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls { VPNModel.shared.open(url) }
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        VPNModel.shared.disconnectForQuit() ? .terminateLater : .terminateNow
     }
 }
 

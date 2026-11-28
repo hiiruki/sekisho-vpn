@@ -83,7 +83,7 @@ struct MenuPanel: View {
                 }
                 Spacer()
                 Button("About") { showAbout() }
-                Button("Quit") { NSApp.terminate(nil) } // the VPN stays up; only the GUI exits
+                Button("Quit") { NSApp.terminate(nil) } // disconnects first (AppDelegate.applicationShouldTerminate)
             }
             .buttonStyle(.borderless)
         }

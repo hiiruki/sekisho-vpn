@@ -195,6 +195,7 @@ final class VPNModel: ObservableObject {
                 autoConnectPending = false
                 if s.state == .disconnected, canConnect { connect() }
             }
+            if s.state == .disconnected, quitting { finishQuit() }
             if s.state == .disconnected, let id = pendingSwitch { // the old tunnel is down: bring up the new one
                 pendingSwitch = nil
                 connect(id)
@@ -327,6 +328,24 @@ final class VPNModel: ObservableObject {
     }
 
     private var pendingSwitch: UUID?
+    private var quitting = false
+
+    /// Quitting takes the VPN down too: a tunnel left running without its app kept routing everything (a full tunnel
+    /// carried even Discord's voice over TCP) with no visible way to stop it. True when quitting has to wait for the
+    /// helper; it gets 5 s, then the app quits anyway.
+    func disconnectForQuit() -> Bool {
+        guard helperReachable, busy else { return false }
+        quitting = true
+        disconnect()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { self.finishQuit() }
+        return true
+    }
+
+    private func finishQuit() {
+        guard quitting else { return }
+        quitting = false
+        NSApp.reply(toApplicationShouldTerminate: true)
+    }
 
     /// Another profile while connected (menu bar): disconnect, then connect to it once the tunnel is down.
     func switchTo(_ id: UUID) {
