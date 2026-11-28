@@ -16,7 +16,7 @@ Command Line Tools and Swift Package Manager are enough.
   &nbsp;&nbsp;
   <img src="docs/images/menu-bar.png" width="300" alt="Sekisho menu bar panel: connection status, speeds, duration, latency, health check and Switch to">
 </p>
-<p align="center"><sub>Sample data: <code>vpn.example.com</code> in split tunnel, with a health check on an internal host.</sub></p>
+<p align="center"><sub>Sample data: <code>vpn.hiiruki.moe</code> in split tunnel, with a health check on an internal host.</sub></p>
 
 | | |
 |---|---|
