@@ -340,6 +340,34 @@ final class VPNModel: ObservableObject {
 
     func disconnect() { link.send(Request(.disconnect)) }
 
+    /// Session history as CSV (oldest first) for reports. Reasons can carry server text, so fields that a spreadsheet
+    /// would run as a formula are prefixed with an apostrophe.
+    func exportHistory() {
+        let stamp = DateFormatter()
+        stamp.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "Sekisho-history-\(stamp.string(from: Date())).csv"
+        panel.allowedContentTypes = [.commaSeparatedText]
+        NSApp.activate(ignoringOtherApps: true)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let iso = ISO8601DateFormatter()
+        func field(_ s: String) -> String {
+            let safe = s.first.map { "=+-@".contains($0) } == true ? "'" + s : s
+            return safe.contains(where: { ",\"\n\r".contains($0) }) ? "\"" + safe.replacingOccurrences(of: "\"", with: "\"\"") + "\"" : safe
+        }
+        var csv = "started,ended,profile,seconds,bytes_down,bytes_up,ended_by,reason\n"
+        for s in sessions.reversed() {
+            csv += [iso.string(from: Date(timeIntervalSince1970: s.start)), iso.string(from: Date(timeIntervalSince1970: s.end)),
+                    field(s.profile), String(Int(s.end - s.start)), String(s.rx), String(s.tx),
+                    s.dropped ? "dropped" : "disconnected", field(s.reason)].joined(separator: ",") + "\n"
+        }
+        do {
+            try csv.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            installError = String(localized: "Export failed: \(error.localizedDescription)")
+        }
+    }
+
     /// Reconnecting behind the kill switch: a Wi-Fi login page (captive portal) cannot load, so a pause is offered.
     var killSwitchHolding: Bool {
         dropped && status.state == .connecting && status.killSwitchPausedUntil == nil

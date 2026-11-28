@@ -19,6 +19,7 @@ struct HistoryView: View {
                 Text("\(vpn.sessions.count) sessions, \(drops) dropped, ↓ \(bytes(Double(vpn.sessions.map(\.rx).reduce(0, +)))) ↑ \(bytes(Double(vpn.sessions.map(\.tx).reduce(0, +))))")
                     .foregroundStyle(.secondary)
                 Spacer()
+                Button("Export CSV…") { vpn.exportHistory() }.disabled(vpn.sessions.isEmpty)
                 Button("Clear History") { vpn.clearHistory() }.disabled(vpn.sessions.isEmpty)
             }
         }
