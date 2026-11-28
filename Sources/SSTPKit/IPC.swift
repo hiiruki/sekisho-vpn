@@ -5,7 +5,7 @@ import Foundation
 
 public let daemonSocketPath = ProcessInfo.processInfo.environment["SSTPD_SOCKET"] ?? "/var/run/sekisho.sock"
 /// Bump when Event/Status or helper behavior change, so the GUI asks to update the installed helper.
-public let protocolVersion = 8
+public let protocolVersion = 9
 
 public struct Profile: Codable, Equatable, Identifiable {
     public var id = UUID()

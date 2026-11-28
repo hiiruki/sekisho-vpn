@@ -28,9 +28,14 @@ sudo python3 - "$SOCK" "$PIN" <<'EOF'
 import json, socket, subprocess, sys, time
 
 sock_path, pin = sys.argv[1], sys.argv[2]
-s = socket.socket(socket.AF_UNIX)
-s.connect(sock_path)
-f = s.makefile("rwb")
+
+def open_client():
+    global s, f
+    s = socket.socket(socket.AF_UNIX)
+    s.connect(sock_path)
+    f = s.makefile("rwb")
+
+open_client()
 
 def send(req):
     f.write((json.dumps(req) + "\n").encode())
@@ -60,9 +65,10 @@ def check(ok, what):
     print("ok:", what)
 
 wait(lambda st: True, 10)  # first event: current status and log backlog
-send({"cmd": "connect", "profile": {
+profile = {
     "name": "e2e", "server": "127.0.0.1", "port": 443, "username": "test@DEFAULT", "password": "e2e-pass",
-    "pinnedCert": pin, "routes": "192.168.30.0/24, example.com", "healthCheck": "example.com:80", "autoReconnect": False}})
+    "pinnedCert": pin, "routes": "192.168.30.0/24, example.com", "healthCheck": "example.com:80", "autoReconnect": False}
+send({"cmd": "connect", "profile": profile})
 st = wait(lambda st: st["state"] == "connected" or (st["state"] == "disconnected" and st.get("message")), 60)
 check(st["state"] == "connected", "connected: " + st.get("message", ""))
 ip, ifname = st["localIP"], st["interface"]
@@ -87,5 +93,16 @@ check(ifname not in out("ifconfig", "-l").split(), f"{ifname} removed")
 check(f"interface: {ifname}" not in out("route", "-n", "get", "192.168.30.1"), "routes removed")
 h = json.load(open("/var/db/sekisho.sessions.json"))
 check(h and h[0]["profile"] == "e2e" and not h[0]["dropped"], "session recorded as disconnected")
+
+# the app crashes or is force-quit: the socket closes without a disconnect, and the helper must not leave the tunnel up
+send({"cmd": "connect", "profile": profile})
+st = wait(lambda st: st["state"] == "connected", 60)
+ifname = st["interface"]
+f.close(); s.close()
+time.sleep(40)  # 30 s grace for a restarting app
+check(ifname not in out("ifconfig", "-l").split(), f"{ifname} removed after the app went away")
+open_client()
+st = wait(lambda st: True, 10)
+check(st["state"] == "disconnected", "helper reports disconnected")
 print("e2e passed")
 EOF

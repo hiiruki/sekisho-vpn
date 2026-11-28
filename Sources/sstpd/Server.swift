@@ -23,6 +23,8 @@ final class Server {
     private var killSwitchPausedUntil: Date? // network login page (captive portal) in progress
     private var pauseEnd: DispatchWorkItem?
     private let clientRequirement: SecRequirement?
+    private var orphanStop: DispatchWorkItem? // pending end of a session no app is connected to
+    private static let orphanGrace: TimeInterval = 30
     private var history: [Session] = [] // newest first, at most 200
     private var connectedStatus: Status? // latest status of the tunnel while it is up, for its history entry
     private static let historyFile = "/var/db/sekisho.sessions.json"
@@ -111,9 +113,12 @@ final class Server {
         s.setCancelHandler { [self] in
             close(c)
             clients[c] = nil
+            if clients.isEmpty { scheduleOrphanStop() }
         }
         s.resume()
         clients[c] = s
+        orphanStop?.cancel() // an app is back (restarted after a crash or an update)
+        orphanStop = nil
         write(encodeLine(Event(status: status, log: backlog, sessions: history)), to: c)
     }
 
@@ -147,9 +152,7 @@ final class Server {
         case .status:
             write(encodeLine(Event(status: status)), to: c)
         case .disconnect:
-            guard session != nil || tunnel != nil else { return }
-            session = nil
-            if let t = tunnel { t.stop() } else { endSession(nil) }
+            stopSession(nil)
         case .connect:
             guard session == nil, tunnel == nil, let p = req.profile else { return }
             if let problem = p.problem { return endSession(problem) }
@@ -231,6 +234,27 @@ final class Server {
         }
         tunnel = t
         t.start()
+    }
+
+    /// Ends the session as on a user disconnect (routes, DNS and kill switch reverted). `why` goes to the log.
+    private func stopSession(_ why: String?) {
+        guard session != nil || tunnel != nil else { return }
+        if let why { log(why) }
+        session = nil
+        if let t = tunnel { t.stop() } else { endSession(nil) }
+    }
+
+    /// No app is connected any more: it crashed, was force-quit or killed. A tunnel nobody can see or stop must not keep
+    /// routing the Mac's traffic, so it ends after a grace period long enough for the app to come back.
+    private func scheduleOrphanStop() {
+        guard session != nil || tunnel != nil else { return }
+        orphanStop?.cancel()
+        let w = DispatchWorkItem { [weak self] in
+            guard let self, self.clients.isEmpty else { return }
+            self.stopSession("No Sekisho app connected for \(Int(Self.orphanGrace)) s; disconnecting")
+        }
+        orphanStop = w
+        q.asyncAfter(deadline: .now() + Self.orphanGrace, execute: w)
     }
 
     private func endSession(_ message: String?, untrustedCert: String? = nil) {
