@@ -17,22 +17,22 @@ Command Line Tools and Swift Package Manager are enough.
 ## Features
 
 - **SSTP** over TLS 1.2+ with **MS-CHAPv2** and SSTP crypto binding (works with Windows RRAS / SSTP servers)
-- **Profiles**: several servers; passwords in the macOS Keychain
+- **Profiles**: several servers; passwords in the macOS Keychain, or asked for on every connect; optional **one-time code** (password + OTP for RADIUS servers)
 - **Full tunnel** (all traffic) or **split tunnel** (only listed subnets or hostnames) with **split DNS** (only listed domains)
 - **Kill switch** (full tunnel): blocks internet while the VPN is down, including during reconnects; can be paused for 2 minutes so a hotel or café Wi-Fi login page can load
 - **Auto-reconnect** after drops, sleep/wake or network changes (backoff 2 s → 60 s)
 - **Certificate pinning** for servers whose certificate macOS does not trust (self-signed / private CA), and a warning 14 days before the server certificate expires
 - **Health check**: an internal host that must be reachable through the VPN; the session reconnects when it is not
 - **IPv6 leak protection** in full-tunnel mode
-- **Live logs** (copy all, export to a `.log` file), **speed** and totals, **latency** to the server, a 60-second **speed chart**, connection **duration**, **session history** (kept by the helper, so also while the app is closed)
+- **Live logs** (copy all, export to a `.log` file), **speed** and totals, **latency** to the server, a 60-second **speed chart**, connection **duration**, **session history** (kept by the helper, so also while the app is closed; export as CSV)
 - **Diagnostics…**: one `.log` with the log, routes, DNS and interfaces for your VPN administrator (no passwords)
 - **Profile files**: export a profile as `.sekisho` (without the password) for colleagues; import or double-click to add
-- **Links** for Shortcuts, Raycast or Focus filters: `sekisho://connect?profile=Name`, `sekisho://disconnect`, `sekisho://toggle`
-- **Menu bar**: fixed-width ↑/↓ speed readout, connect/disconnect per profile; **⌃⌥⌘V** toggles the VPN from any app
-- **Auto-connect** whenever the Mac is not on a trusted Wi-Fi (needs Location permission: macOS hides Wi-Fi names otherwise)
-- **Notifications** for connected, connection lost, reconnected, disconnected and failed connections; **launch at login**; **connect when the app starts**
+- **Links** for Shortcuts, Raycast or Focus filters: `sekisho://connect?profile=Name`, `sekisho://disconnect`, `sekisho://toggle` (a link that disconnects asks first, unless you allow it once for all)
+- **Menu bar**: fixed-width ↑/↓ speed readout, connect/disconnect per profile, **switch profiles** while connected; **⌃⌥⌘V** toggles the VPN from any app
+- **Auto-connect** whenever the Mac is not on a trusted Wi-Fi, with a **profile per Wi-Fi** if you like (needs Location permission: macOS hides Wi-Fi names otherwise)
+- **Notifications** for connected, connection lost, reconnected, disconnected and failed connections, with **Connect Again** and **Open Login Page** buttons; **launch at login**; **connect when the app starts**
 - **Updates** through Sparkle from GitHub Releases (**Sekisho → Check for Updates…**); **Uninstall Helper…** in the same menu
-- **English and Bahasa Indonesia** (follows the system language, or set it per app in System Settings → General → Language & Region)
+- **English, Bahasa Indonesia and Japanese** (follows the system language, or set it per app in System Settings → General → Language & Region)
 
 ## Install
 
@@ -99,6 +99,9 @@ force-push, tags cannot be moved or deleted.
 | Reconnect automatically | Reconnects a session that was up and dropped. Wrong password or an untrusted certificate never retries |
 | Pinned certificate | Set by **Trust This Certificate and Connect**. Compare the fingerprint with your administrator first |
 | Health check | Optional `host` or `host:port` (default 443) inside the network. Checked every 30 s over TCP; unreachable for 90 s reconnects (with Reconnect automatically). In split tunnel, list the host under Split tunnel too |
+| Remember password | Off: the Keychain item is removed and the password is asked for on every connect |
+| Ask for a one-time code | Asks for a code on connect and sends it right after the password (RADIUS OTP). Automatic reconnects cannot reuse it, so they fail once the code has expired |
+| Auto-connect on Wi-Fi | Wi-Fi names (comma-separated) on which auto-connect uses this profile instead of the selected one |
 
 ## How it works
 

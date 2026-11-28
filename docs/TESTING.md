@@ -13,9 +13,16 @@ real VPN server, Wi-Fi changes or a person at the Mac is below: about 15 minutes
 | 6 | **Diagnostics…** | One `.log` with Status (including `certExpires`), profile, `netstat`, `scutil --dns`, `ifconfig`, log; `grep -i password` finds only the empty field |
 | 7 | Quit the app while connected, disconnect with the hotkey from a relaunched app, then reopen **Session History** | Sessions from while the app was closed are listed; *Dropped: …* for drops, with the reason |
 | 8 | **File → Export Profile…**, then **Import Profile…** the file | The file has no password; import asks for confirmation (showing a pinned certificate, if any) and adds *… (imported)* |
-| 9 | `open "sekisho://toggle"`, then `open "sekisho://connect?profile=nope"` | The VPN toggles; then a notification *Unknown profile* |
+| 9 | While connected: `open "sekisho://toggle"`, then `open "sekisho://connect?profile=nope"` | *Disconnect the VPN?* first (Cancel keeps it up; *Don't ask again for links* skips it later); then a notification *Unknown profile* |
 | 10 | ⌃⌥⌘V in another app | The VPN toggles |
 | 11 | VoiceOver (⌘F5) over the profile buttons and the menu bar item | *Add profile*, *Remove this profile*, *Share profiles*; the menu bar item reads its state and speeds |
-| 12 | System Settings → General → Language & Region → Applications: Sekisho → Indonesian; relaunch | Window, menu bar, alerts and notifications in Bahasa Indonesia |
+| 12 | System Settings → General → Language & Region → Applications: Sekisho → Indonesian, then Japanese; relaunch each time | Window, menu bar, alerts and notifications in that language |
 | 13 | **Sekisho → Uninstall Helper…** | After confirming and the admin prompt: *Install Helper…* banner; `/var/db/sekisho.sessions.json` is gone; install again |
 | 14 | On the previous version: **Check for Updates…** | The update dialog lists the release notes |
+| 15 | Turn off **Remember password**, connect | The password is asked for; `security find-generic-password -s com.sstpvpn.client -a <profile id>` finds nothing |
+| 16 | Turn on **Ask for a one-time code** (server with OTP), connect | Password (if not remembered) and code are asked for; the server accepts password + code |
+| 17 | Two profiles; connected to one, menu bar → **Switch to** the other | It disconnects, then connects to the other |
+| 18 | **Auto-connect on Wi-Fi**: the current Wi-Fi name on a second profile; turn auto-connect off and on | It connects with that profile |
+| 19 | Stop the server or block it while connected (or enter a wrong password and connect) | Notification with **Connect Again**; on a kill-switch profile, *Connection lost* with **Open Login Page** |
+| 20 | **Session History → Export CSV…** | One line per session, oldest first; opens in Numbers or Excel |
+| 21 | `DYLD_INSERT_LIBRARIES=<any dylib> /Applications/Sekisho.app/Contents/MacOS/SSTPClient` | The library is not loaded (hardened runtime) |
