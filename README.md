@@ -1,11 +1,22 @@
-# Sekisho (関所)
+<p align="center">
+  <img src="docs/images/icon.png" width="160" alt="Sekisho app icon: a glass shield holding a checkpoint gate with a keyhole">
+</p>
 
-**SSTP VPN client for macOS** · by [Hiiruki](https://hiiruki.moe)
+<h1 align="center">Sekisho (関所)</h1>
+
+<p align="center"><b>SSTP VPN client for macOS</b> · by <a href="https://hiiruki.moe">Hiiruki</a></p>
 
 A *sekisho* was a checkpoint gate on the old Japanese highways: you passed only with the right papers. Sekisho is a
 native SSTP VPN client for macOS 13+ on Apple silicon and Intel: a SwiftUI window and menu bar app, plus a small root helper (`sstpd`) that
 creates the tunnel with a plain `utun` interface. No NetworkExtension, no paid developer account, no Xcode:
 Command Line Tools and Swift Package Manager are enough.
+
+<p align="center">
+  <img src="docs/images/window.png" width="440" alt="Sekisho window: a connected profile with live speeds, latency, a health check, the speed chart and the log">
+  &nbsp;&nbsp;
+  <img src="docs/images/menu-bar.png" width="300" alt="Sekisho menu bar panel: connection status, speeds, duration, latency, health check and Switch to">
+</p>
+<p align="center"><sub>Sample data: <code>vpn.example.com</code> in split tunnel, with a health check on an internal host.</sub></p>
 
 | | |
 |---|---|
