@@ -195,6 +195,10 @@ final class VPNModel: ObservableObject {
                 autoConnectPending = false
                 if s.state == .disconnected, canConnect { connect() }
             }
+            if s.state == .disconnected, let id = pendingSwitch { // the old tunnel is down: bring up the new one
+                pendingSwitch = nil
+                connect(id)
+            }
             autoConnectIfUntrusted() // also covers networks seen before the helper answered
         }
         if let ss = e.sessions { sessions = ss }
@@ -320,6 +324,18 @@ final class VPNModel: ObservableObject {
     func connect(_ id: UUID) {
         selectedID = id
         connect()
+    }
+
+    private var pendingSwitch: UUID?
+
+    /// Another profile while connected (menu bar): disconnect, then connect to it once the tunnel is down.
+    func switchTo(_ id: UUID) {
+        if busy {
+            pendingSwitch = id
+            disconnect()
+        } else {
+            connect(id)
+        }
     }
 
     func disconnect() { link.send(Request(.disconnect)) }

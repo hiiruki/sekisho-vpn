@@ -60,6 +60,14 @@ struct MenuPanel: View {
                     }
                 }
                 .font(.callout.monospacedDigit())
+                if vpn.profiles.count > 1 {
+                    Menu("Switch to") {
+                        ForEach(vpn.profiles.filter { $0.id != vpn.sessionProfile?.id }) { p in
+                            Button(p.name.isEmpty ? p.server : p.name) { vpn.switchTo(p.id) }
+                        }
+                    }
+                    .fixedSize()
+                }
             } else if vpn.profiles.count > 1 {
                 Picker("Profile", selection: $vpn.selectedID) {
                     ForEach(vpn.profiles) { p in Text(p.name.isEmpty ? p.server : p.name).tag(p.id) }
