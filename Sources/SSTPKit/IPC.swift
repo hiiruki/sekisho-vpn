@@ -31,6 +31,9 @@ public struct Profile: Codable, Equatable, Identifiable {
     public var askCode = false
     /// Wi-Fi names (comma-separated) on which auto-connect uses this profile instead of the selected one
     public var wifiNetworks = ""
+    /// Full tunnel only: subnets or hostnames that keep using the normal network (voice and video calls, which suffer
+    /// over SSTP's TCP). Hostnames are resolved and routed by address, like split-tunnel hostnames.
+    public var bypass = ""
 
     public init() {}
 
@@ -54,6 +57,7 @@ public struct Profile: Codable, Equatable, Identifiable {
         savePassword = try c.decodeIfPresent(Bool.self, forKey: .savePassword) ?? d.savePassword
         askCode = try c.decodeIfPresent(Bool.self, forKey: .askCode) ?? d.askCode
         wifiNetworks = try c.decodeIfPresent(String.self, forKey: .wifiNetworks) ?? d.wifiNetworks
+        bypass = try c.decodeIfPresent(String.self, forKey: .bypass) ?? d.bypass
     }
 
     /// Wi-Fi names may contain spaces, so only commas separate them
@@ -66,6 +70,9 @@ public struct Profile: Codable, Equatable, Identifiable {
     public var routeHosts: [String] { routeList.filter { parseCIDR($0) == nil } }
     public var domainList: [String] { tokens(dnsDomains) }
     public var isFullTunnel: Bool { routeList.isEmpty }
+    public var bypassList: [String] { isFullTunnel ? tokens(bypass) : [] } // split tunnel already leaves the rest out
+    public var bypassSubnets: [String] { bypassList.compactMap(parseCIDR) }
+    public var bypassHosts: [String] { bypassList.filter { parseCIDR($0) == nil } }
 
     public var healthTarget: (host: String, port: UInt16)? {
         let parts = healthCheck.trimmingCharacters(in: .whitespaces).split(separator: ":", omittingEmptySubsequences: false).map(String.init)
@@ -79,6 +86,8 @@ public struct Profile: Codable, Equatable, Identifiable {
         if server.isEmpty || server.contains(where: { $0.isWhitespace || $0 == "/" }) { return "Server is required" }
         if port == 0 { return "Port is required" }
         if let bad = routeList.first(where: { parseCIDR($0) == nil && !isHostname($0) }) { return "Invalid subnet or hostname: \(bad)" }
+        if let bad = bypassList.first(where: { parseCIDR($0) == nil && !isHostname($0) }) { return "Invalid subnet or hostname to bypass: \(bad)" }
+        if killSwitch, !bypassList.isEmpty { return "The kill switch would block the bypassed traffic; use one or the other" }
         if let bad = domainList.first(where: { !isDomainName($0) }) { return "Invalid domain: \(bad)" }
         if !healthCheck.trimmingCharacters(in: .whitespaces).isEmpty, healthTarget == nil { return "Invalid health check: \(healthCheck)" }
         if let pin = pinnedCert?.replacingOccurrences(of: ":", with: ""), pin.count != 64 || !pin.allSatisfy(\.isHexDigit) {

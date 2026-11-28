@@ -46,6 +46,7 @@ public final class Tunnel {
     private var routedHosts: Set<String> = [] // addresses of split-tunnel hostnames already routed
     private var unresolvedHosts: Set<String> = [] // retried every tick: the VPN's DNS can be slow right after connecting
     private var resolving = false
+    private var physicalVia: [String]? // `route` arguments for the normal network (the old gateway), for bypassed traffic
     private var healthFailures = 0
 
     private static let serviceKey = "State:/Network/Service/Sekisho"
@@ -286,14 +287,25 @@ public final class Tunnel {
 
             // keep the tunnel's own TLS traffic off the tunnel
             if let ip = serverIP, let r = try? routeTo(ip) {
-                try? sys("/sbin/route", ["-n", "add", "-host", ip] + (r.gateway.map { [$0] } ?? ["-interface", r.interface]),
-                         undo: ["-n", "delete", "-host", ip])
+                let via = r.gateway.map { [$0] } ?? ["-interface", r.interface]
+                physicalVia = via
+                try? sys("/sbin/route", ["-n", "add", "-host", ip] + via, undo: ["-n", "delete", "-host", ip])
             }
 
             if profile.isFullTunnel {
                 for net in ["0.0.0.0/1", "128.0.0.0/1"] { // beats the default route without replacing it
                     try sys("/sbin/route", ["-n", "add", "-net", net, "-interface", name],
                             undo: ["-n", "delete", "-net", net, "-interface", name])
+                }
+                // bypass: more specific than the two halves, so these leave through the normal network. One that
+                // fails (e.g. the LAN, which already has its own route) is logged and does not stop the connection.
+                for net in profile.bypassSubnets {
+                    guard let via = physicalVia else { log("No route outside the tunnel; \(net) is not bypassed"); continue }
+                    do {
+                        try sys("/sbin/route", ["-n", "add", "-net", net] + via, undo: ["-n", "delete", "-net", net])
+                    } catch {
+                        log("Bypass \(net) failed: \(error)")
+                    }
                 }
                 do { try PF.load(Self.ipv6Anchor, PF.blockIPv6, undo: undo) } catch { log("IPv6 leak protection failed: \(error)") }
             } else {
@@ -305,7 +317,8 @@ public final class Tunnel {
 
             try applyDNS(dns, interface: name, local: local)
 
-            let mode = profile.isFullTunnel ? "all traffic" : "split: \(profile.routeList.joined(separator: ", "))"
+            let bypass = profile.bypassList.isEmpty ? "" : ", bypass: \(profile.bypassList.joined(separator: ", "))"
+            let mode = profile.isFullTunnel ? "all traffic" + bypass : "split: \(profile.routeList.joined(separator: ", "))"
             log("\(name): \(local) → \(remote), mtu \(cfg.mtu), \(mode), DNS \(dnsApplied ? dns.joined(separator: ", ") : "unchanged")")
 
             status.interface = name
@@ -352,35 +365,38 @@ public final class Tunnel {
     }
 
     /// Split-tunnel hostnames: resolve (through the VPN's DNS, see applyDNS) and route each new address into the tunnel.
-    /// Addresses that disappear keep their route until disconnect.
+    /// Bypassed hostnames (full tunnel): the same, but routed through the normal network. Addresses that disappear keep
+    /// their route until disconnect.
     private func routeHosts() {
-        let hosts = profile.routeHosts, server = serverIP
-        guard !hosts.isEmpty, !resolving, let name = status.interface else { return }
+        let server = serverIP
+        guard !resolving, let name = status.interface else { return }
+        let targets: [(host: String, via: [String], outside: Bool)] = profile.routeHosts.map { ($0, ["-interface", name], false) }
+            + (physicalVia.map { via in profile.bypassHosts.map { ($0, via, true) } } ?? [])
+        guard !targets.isEmpty else { return }
         resolving = true // a lookup can take 30 s to time out, longer than a tick
         DispatchQueue.global().async { [weak self] in
-            let resolved = hosts.map { ($0, resolveAllIPv4($0)) }
+            let resolved = targets.map { ($0, resolveAllIPv4($0.host)) }
             self?.q.async {
                 guard let self, !self.ended else { return }
                 self.resolving = false
-                for (host, ips) in resolved {
+                for (t, ips) in resolved {
                     if ips.isEmpty {
-                        if self.unresolvedHosts.insert(host).inserted { log("Cannot resolve \(host); retrying every 10 s") }
+                        if self.unresolvedHosts.insert(t.host).inserted { log("Cannot resolve \(t.host); retrying every 10 s") }
                         continue
                     }
-                    self.unresolvedHosts.remove(host)
+                    self.unresolvedHosts.remove(t.host)
                     // never the VPN server itself: its route must stay outside the tunnel
                     let new = ips.filter { $0 != server && !self.routedHosts.contains($0) }
                     guard !new.isEmpty else { continue }
                     for ip in new {
                         do {
-                            try self.sys("/sbin/route", ["-n", "add", "-host", ip, "-interface", name],
-                                         undo: ["-n", "delete", "-host", ip, "-interface", name])
+                            try self.sys("/sbin/route", ["-n", "add", "-host", ip] + t.via, undo: ["-n", "delete", "-host", ip])
                             self.routedHosts.insert(ip)
                         } catch {
                             log("Route to \(ip) failed: \(error)")
                         }
                     }
-                    log("\(host) → \(new.joined(separator: ", "))")
+                    log("\(t.host) → \(new.joined(separator: ", "))" + (t.outside ? " (outside the VPN)" : ""))
                 }
             }
         }

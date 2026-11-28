@@ -143,3 +143,7 @@
 "Off" = "オフ";
 "Turn Off" = "オフにする";
 "macOS refused that shortcut; pick another." = "macOS がこのショートカットを拒否しました。別のものを選んでください。";
+"Bypass the VPN" = "VPN を経由しない";
+"optional: 162.159.128.0/19, zoom.us" = "任意: 162.159.128.0/19, zoom.us";
+"full tunnel only" = "フルトンネルのみ";
+"Full tunnel only: subnets or hostnames that keep using your normal network, e.g. for voice and video calls, which stutter over SSTP. Services whose addresses change often need their subnets. Not together with the kill switch." = "フルトンネルのみ: 通常のネットワークを使い続けるサブネットまたはホスト名（SSTP 経由では途切れやすい音声・ビデオ通話など）。アドレスが頻繁に変わるサービスはサブネットで指定してください。キルスイッチとは併用できません。";

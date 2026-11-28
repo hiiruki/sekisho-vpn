@@ -143,3 +143,7 @@
 "Off" = "Mati";
 "Turn Off" = "Matikan";
 "macOS refused that shortcut; pick another." = "macOS menolak shortcut itu; pilih yang lain.";
+"Bypass the VPN" = "Lewati VPN";
+"optional: 162.159.128.0/19, zoom.us" = "opsional: 162.159.128.0/19, zoom.us";
+"full tunnel only" = "hanya full tunnel";
+"Full tunnel only: subnets or hostnames that keep using your normal network, e.g. for voice and video calls, which stutter over SSTP. Services whose addresses change often need their subnets. Not together with the kill switch." = "Hanya full tunnel: subnet atau hostname yang tetap memakai jaringan biasa, misalnya untuk panggilan suara dan video yang tersendat lewat SSTP. Layanan yang alamatnya sering berubah perlu ditulis subnetnya. Tidak bisa digabung dengan kill switch.";
